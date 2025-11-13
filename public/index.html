@@ -1520,6 +1520,18 @@
         </div>
     </div>
 
+    <!-- Confirm Logout Modal -->
+    <div id="confirm-logout-modal" class="login-modal-overlay hidden">
+        <div class="login-box">
+            <h2>Confirm Logout</h2>
+            <p>Are you sure you want to logout?</p>
+            <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
+                <button id="confirm-logout-btn" class="send-icon-button" style="background: #d6336c; color: white; border-radius: 20px; padding: 10px 20px; font-size: 1rem; font-weight: 600;">Confirm</button>
+                <button id="cancel-logout-btn" class="send-icon-button" style="background: #888; color: white; border-radius: 20px; padding: 10px 20px; font-size: 1rem; font-weight: 600;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main container for the two chat boxes -->
     <div class="chat-app-container hidden" id="chat-app-container">
 
@@ -1527,7 +1539,7 @@
         <div class="chat-box" id="raushan-chat">
             <div class="chat-header">
                 <div class="user-info">
-                    <span>❤️ Raushan_143 ❤️</span>
+                    <span>💎_Alpha_💎</span>
                     <div class="status-indicator" id="nisha-status">
                         <span class="status-dot"></span>
                         <span class="status-text">Offline</span>
@@ -1571,7 +1583,7 @@
         <div class="chat-box" id="nisha-chat">
             <div class="chat-header">
                 <div class="user-info">
-                    <span>💖 Nisha_143 💖</span>
+                    <span>💎_Beta_💎</span>
                     <div class="status-indicator" id="raushan-status">
                         <span class="status-dot"></span>
                         <span class="status-text">Offline</span>
@@ -1710,6 +1722,11 @@
             const soundAlertMessage = document.getElementById('sound-alert-message');
             const stopAlertBtn = document.getElementById('stop-alert-btn');
             const alarmSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-police-siren-us-1643.mp3'); // Switched to a more reliable source
+
+            // New elements for custom logout modal
+            const confirmLogoutModal = document.getElementById('confirm-logout-modal');
+            const confirmLogoutBtn = document.getElementById('confirm-logout-btn');
+            const cancelLogoutBtn = document.getElementById('cancel-logout-btn');
             
             // Live Video Chat elements
             const liveVideoModal = document.getElementById('live-video-modal');
@@ -1922,9 +1939,7 @@
                 }
                 try {
                     currentLiveFacingMode = 'user';
-                    liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentLiveFacingMode }, audio: true });
-                    liveVideoLocal.srcObject = liveStream;
-                    liveVideoLocal.classList.add('mirrored');
+                    liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentLiveFacingMode }, audio: true }); liveVideoLocal.srcObject = liveStream; liveVideoLocal.classList.add('mirrored');
 
                     liveVideoPeerConnection = new RTCPeerConnection(iceServers);
                     liveStream.getTracks().forEach(track => liveVideoPeerConnection.addTrack(track, liveStream));
@@ -2133,6 +2148,7 @@
                     
                     // This is the key fix: Update the UI to the 'active' state for the sender
                     showCallModal('active', callRecipient, callType); // Now uses the correct callType
+                    showCallModal('active', callRecipient, outgoingCallType); // Now uses the correct callType
                 }
             };
 
@@ -3438,8 +3454,8 @@
             // --- Login and View Switching Logic ---
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                 const username = usernameInput.value;
-                 const password = passwordInput.value;
+                const username = usernameInput.value;
+                const password = passwordInput.value;
 
                 const response = await fetch('/api/login', {
                     method: 'POST',
@@ -3451,6 +3467,9 @@
                     const { user } = await response.json();
                     activeUser = user; // Set the active user
  
+                    // Push a state to the history to handle back/forward navigation
+                    history.pushState({ loggedIn: true }, 'Chat');
+
                      // Stop polling for unread messages since we're in the chat
                      clearInterval(unreadCountInterval);
  
@@ -3473,23 +3492,29 @@
                  }
             });
 
+            const performLogout = () => {
+                chatAppContainer.classList.add('hidden');
+                document.getElementById('raushan-chat').classList.add('hidden');
+                document.getElementById('nisha-chat').classList.add('hidden');
+
+                selectionContainer.classList.remove('hidden');
+                document.body.classList.remove('chat-active'); // Revert to the original background
+                activeUser = null;
+                // Disconnect WebSocket when logging out to unregister the user on the server
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.close();
+                }
+                socket = null; // Fully clear the socket variable
+
+                updateUnreadCounts(); // Check counts immediately
+                unreadCountInterval = setInterval(updateUnreadCounts, 5000); // Restart polling
+            };
+
             switchUserButtons.forEach(button => {
                 button.addEventListener('click', () => {
-                    chatAppContainer.classList.add('hidden');
-                    document.getElementById('raushan-chat').classList.add('hidden');
-                    document.getElementById('nisha-chat').classList.add('hidden');
-
-                    selectionContainer.classList.remove('hidden');
-                    document.body.classList.remove('chat-active'); // Revert to the original background
-                    activeUser = null;
-                    // Disconnect WebSocket when logging out to unregister the user on the server
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.close();
-                    }
-                    socket = null; // Fully clear the socket variable
-
-                    updateUnreadCounts(); // Check counts immediately
-                    unreadCountInterval = setInterval(updateUnreadCounts, 5000); // Restart polling
+                    // Show the custom logout confirmation modal
+                    confirmLogoutModal.classList.remove('hidden');
+                    confirmLogoutModal.classList.add('visible');
                 });
             });
 
@@ -3602,6 +3627,32 @@
                 });
             });
 
+            // Handle browser back/forward button after login
+            window.addEventListener('popstate', (event) => {
+                // If the user is logged in and tries to navigate away
+                if (activeUser) {
+                    // Show the custom logout confirmation modal
+                    confirmLogoutModal.classList.remove('hidden');
+                    confirmLogoutModal.classList.add('visible');
+                }
+            });
+
+            // --- Custom Logout Modal Logic ---
+            confirmLogoutBtn.addEventListener('click', () => {
+                performLogout();
+                confirmLogoutModal.classList.remove('visible');
+                confirmLogoutModal.classList.add('hidden');
+            });
+
+            cancelLogoutBtn.addEventListener('click', () => {
+                confirmLogoutModal.classList.remove('visible');
+                confirmLogoutModal.classList.add('hidden');
+            });
+
+            // Also close modal if clicking on the overlay
+            confirmLogoutModal.addEventListener('click', (e) => {
+                if (e.target === confirmLogoutModal) cancelLogoutBtn.click();
+            });
             // --- Unread Count Logic ---
             async function updateUnreadCounts() {
                 // Fetch for Raushan (messages sent by Nisha)

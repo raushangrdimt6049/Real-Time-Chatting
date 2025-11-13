@@ -1,8 +1,10 @@
 require('dotenv').config(); // Load environment variables
 const express = require('express');
 const http = require('http');
-const { WebSocketServer } = require('ws');
+const { WebSocket, WebSocketServer } = require('ws');
 const path = require('path');
+// It's best practice to load dotenv first, then require modules that depend on it.
+// This ensures that when firebase.js is imported, process.env is already populated.
 const { db } = require('./firebase'); // Use Firebase
 
 const app = express();
@@ -349,6 +351,12 @@ app.get('/', (req, res) => {
 const startServer = async () => {
     try {
         // Firebase is initialized in firebase.js
+        // Log the environment for easier debugging on deployment platforms
+        if (process.env.NODE_ENV === 'production') {
+            console.log('Server starting in production mode...');
+        } else {
+            console.log('Server starting in development mode...');
+        }
 
         server.listen(PORT, () => {
             console.log(`Server is listening on http://localhost:${PORT}`);
