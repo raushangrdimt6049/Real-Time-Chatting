@@ -3647,6 +3647,10 @@
             cancelLogoutBtn.addEventListener('click', () => {
                 confirmLogoutModal.classList.remove('visible');
                 confirmLogoutModal.classList.add('hidden');
+                // If the user cancels, we need to push the state back so that the
+                // next back/forward click will trigger the 'popstate' event again.
+                // This effectively cancels the browser's navigation attempt.
+                history.pushState({ loggedIn: true }, 'Chat');
             });
 
             // Also close modal if clicking on the overlay
