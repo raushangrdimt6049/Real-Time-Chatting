@@ -974,6 +974,14 @@
             object-fit: contain;
             background-color: #000;
         }
+        #attachment-preview-file {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            color: white;
+        }
 
         .camera-controls {
             position: absolute;
@@ -1419,6 +1427,10 @@
     <div id="attachment-preview-modal" class="camera-preview-overlay hidden">
         <img id="attachment-preview-image" class="hidden" src="" alt="Attachment Preview">
         <video id="attachment-preview-video" class="hidden" controls src=""></video>
+        <div id="attachment-preview-file" class="hidden">
+            <span style="font-size: 5rem;">📄</span>
+            <h3 id="attachment-preview-filename"></h3>
+        </div>
         <div id="attachment-preview-controls" class="camera-controls">
             <button id="close-attachment-preview" class="camera-control-btn" title="Close">❌</button>
             <button id="send-attachment-btn" class="camera-control-btn" title="Send">Send ➤</button>
@@ -1565,7 +1577,7 @@
                 <span></span><span></span><span></span>
             </div>
             <form class="chat-input-area" id="raushan-form">
-                <input type="file" id="raushan-file-input" class="hidden" accept="image/*,video/*">
+                <input type="file" id="raushan-file-input" class="hidden">
                 <button type="button" class="attach-button" data-user="raushan" title="Attach File">📎</button>
                 <button type="button" class="camera-button" data-user="raushan" title="Use Camera">📸</button>
                 <button type="button" class="voice-record-button" data-user="raushan" title="Record Voice Message">🎤</button>
@@ -1609,7 +1621,7 @@
                 <span></span><span></span><span></span>
             </div>
             <form class="chat-input-area" id="nisha-form">
-                <input type="file" id="nisha-file-input" class="hidden" accept="image/*,video/*">
+                <input type="file" id="nisha-file-input" class="hidden">
                 <button type="button" class="attach-button" data-user="nisha" title="Attach File">📎</button>
                 <button type="button" class="camera-button" data-user="nisha" title="Use Camera">📸</button>
                 <button type="button" class="voice-record-button" data-user="nisha" title="Record Voice Message">🎤</button>
@@ -1686,6 +1698,8 @@
             const attachmentPreviewModal = document.getElementById('attachment-preview-modal');
             const attachmentPreviewImage = document.getElementById('attachment-preview-image');
             const attachmentPreviewVideo = document.getElementById('attachment-preview-video');
+            const attachmentPreviewFile = document.getElementById('attachment-preview-file');
+            const attachmentPreviewFilename = document.getElementById('attachment-preview-filename');
             const closeAttachmentPreviewBtn = document.getElementById('close-attachment-preview');
             const sendAttachmentBtn = document.getElementById('send-attachment-btn');
             const reattachFileBtn = document.getElementById('reattach-file-btn');
@@ -2756,6 +2770,20 @@
                         messageDiv.appendChild(videoEl);
                     }
 
+                    if (msgContent.fileUrl) {
+                        const fileLink = document.createElement('a');
+                        fileLink.href = msgContent.fileUrl;
+                        fileLink.textContent = `📄 ${msgContent.fileName || 'Download File'}`;
+                        fileLink.target = '_blank'; // Open in a new tab
+                        fileLink.download = msgContent.fileName; // Suggest filename for download
+                        fileLink.style.cssText = `
+                            display: inline-block; padding: 10px; background: rgba(0,0,0,0.1); 
+                            border-radius: 8px; text-decoration: none; color: inherit;
+                            margin-bottom: 5px;
+                        `;
+                        messageDiv.appendChild(fileLink);
+                    }
+
 
                     if (msgContent.audioUrl) {
                         // Create a hidden audio element to control playback
@@ -3114,6 +3142,7 @@
 
             let attachedFileUrl = null;
             let attachedFileType = null;
+            let attachedFileName = null;
 
             fileInputs.forEach(input => {
                 input.addEventListener('change', async (e) => {
@@ -3122,6 +3151,7 @@
 
                     activeUserForAttachment = input.id.includes('raushan') ? 'raushan' : 'nisha';
                     attachedFileType = file.type;
+                    attachedFileName = file.name;
 
                     const reader = new FileReader();
                     reader.onload = async (event) => {
@@ -3134,10 +3164,18 @@
                             attachmentPreviewImage.classList.add('hidden');
                             attachmentPreviewVideo.classList.remove('hidden');
                             attachmentPreviewVideo.src = attachedFileUrl;
-                        } else {
+                            attachmentPreviewFile.classList.add('hidden');
+                        } else if (attachedFileType.startsWith('image/')) {
                             attachmentPreviewVideo.classList.add('hidden');
                             attachmentPreviewImage.classList.remove('hidden');
                             attachmentPreviewImage.src = attachedFileUrl;
+                            attachmentPreviewFile.classList.add('hidden');
+                        } else {
+                            // Fallback for other file types (PDF, DOC, etc.)
+                            attachmentPreviewVideo.classList.add('hidden');
+                            attachmentPreviewImage.classList.add('hidden');
+                            attachmentPreviewFile.classList.remove('hidden');
+                            attachmentPreviewFilename.textContent = attachedFileName;
                         }
                     };
                     reader.readAsDataURL(file);
@@ -3150,6 +3188,7 @@
                 attachmentPreviewModal.classList.add('hidden');
                 attachedFileUrl = null;
                 attachedFileType = null;
+                attachedFileName = null;
                 activeUserForAttachment = null;
                 attachmentPreviewVideo.pause();
                 attachmentPreviewVideo.src = "";
@@ -3169,8 +3208,11 @@
                 const content = {};
                 if (attachedFileType.startsWith('video/')) {
                     content.videoUrl = attachedFileUrl;
-                } else {
+                } else if (attachedFileType.startsWith('image/')) {
                     content.imageUrl = attachedFileUrl;
+                } else { // It's another file type
+                    content.fileUrl = attachedFileUrl;
+                    content.fileName = attachedFileName;
                 }
 
                 const messageData = { 
