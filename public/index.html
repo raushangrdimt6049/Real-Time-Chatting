@@ -852,6 +852,25 @@
                 max-height: none;
                 border-radius: 0;
                 border: none;
+        }
+
+        /* --- Download Button Styling --- */
+        .download-button {
+            background: rgba(255, 255, 255, 0.3);
+            border: none;
+            border-radius: 50%;
+            width: 25px; /* Slightly smaller */
+            height: 25px; /* Slightly smaller */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem; /* Smaller font for icon */
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-left: 5px;
+            flex-shrink: 0;
+            color: #333; /* Darker color for better contrast on light background */
+            text-decoration: none; /* Remove underline for <a> tag */
             }
 
             .chat-header {
@@ -1765,6 +1784,7 @@
             let initialStatusLoaded = false; // Flag to check if we've received initial statuses
             const messageElements = new Map(); // To map message ID to its DOM element
 
+            const downloadedMessageIds = new Set(); // To track downloaded files on the client
             let lastMessageDateRaushan = null; // Stores 'YYYY-MM-DD' string for comparison
             let lastMessageDateNisha = null;   // Stores 'YYYY-MM-DD' string for comparison
 
@@ -2707,6 +2727,8 @@
                 const { id, sender, content, time_string: timeString, is_seen: isSeen, seen_at: seenAt, created_at } = messageData;
 
                 // Prevent rendering if message already exists (defensive check)
+                // This also prevents duplicate messages if the server sends them multiple times
+                // or if the client tries to render a message it already has.
                 if (messageElements.has(id)) {
                     return;
                 }
@@ -2762,7 +2784,7 @@
                         messageDiv.appendChild(imageEl);
                     }
 
-                    if (msgContent.videoUrl) {
+                    if (msgContent.videoUrl && !msgContent.fileUrl) { // Ensure it's not also a generic file
                         const videoEl = document.createElement('video');
                         videoEl.src = msgContent.videoUrl;
                         videoEl.className = 'message-video';
@@ -2771,26 +2793,32 @@
                     }
 
                     if (msgContent.fileUrl) {
-                        const fileLink = document.createElement('a');
-                        fileLink.href = msgContent.fileUrl;
+                        const fileContainer = document.createElement('div'); // To group link and button
+                        fileContainer.style.display = 'flex';
+                        fileContainer.style.alignItems = 'center';
+                        fileContainer.style.gap = '5px'; // Space between link and button
+                        fileContainer.style.marginBottom = '5px'; // Match margin of other content
+
+                        const fileLink = document.createElement('span'); // Changed to a span
                         fileLink.textContent = `📄 ${msgContent.fileName || 'Download File'}`;
-                        fileLink.target = '_blank'; // Open in a new tab
-                        fileLink.download = msgContent.fileName; // Suggest filename for download
-                        fileLink.style.cssText = `
-                            display: inline-block; padding: 10px; background: rgba(0,0,0,0.1); 
-                            border-radius: 8px; text-decoration: none; color: inherit;
-                            margin-bottom: 5px;
-                        `;
-                        messageDiv.appendChild(fileLink);
+                        fileLink.style.cssText = `display: inline-block; padding: 8px 12px; background: rgba(0,0,0,0.1); border-radius: 8px; flex-grow: 1;`;
+                        fileContainer.appendChild(fileLink);
+
+                        // Create the download button using the helper function
+                        const downloadBtn = createDownloadButton(
+                            msgContent.fileUrl,
+                            msgContent.fileName || 'downloaded_file',
+                            id // Pass the message ID
+                        );
+                        // Add a specific class for styling if needed
+                        downloadBtn.classList.add('file-download-btn');
+                        fileContainer.appendChild(downloadBtn);
+
+                        messageDiv.appendChild(fileContainer);
                     }
 
 
                     if (msgContent.audioUrl) {
-                        // Create a hidden audio element to control playback
-                        const audioEl = document.createElement('audio');
-                        audioEl.src = msgContent.audioUrl;
-                        audioEl.className = 'message-audio';
-                        messageDiv.appendChild(audioEl);
                         let audioDurationSpan;
 
                         // Create custom player UI
@@ -2799,6 +2827,11 @@
 
                         const playBtn = document.createElement('button');
                         playBtn.className = 'play-pause-btn';
+                        
+                        // Create a hidden audio element to control playback
+                        const audioEl = document.createElement('audio');
+                        audioEl.src = msgContent.audioUrl;
+                        audioEl.className = 'message-audio';
                         playBtn.innerHTML = '▶'; // Play icon
                         
                         const waveformContainer = document.createElement('div');
@@ -2864,17 +2897,29 @@
                         playerDiv.appendChild(waveformContainer);
                         // Do NOT append durationEl to playerDiv. It will be added to the meta div later.
                         messageDiv.appendChild(playerDiv);
+                        messageDiv.appendChild(audioEl); // Append the audio element to the messageDiv
                         messageDiv.audioDurationElement = durationEl; // Attach it to the message div to be used later
                     }
 
                     if (msgContent.text?.trim()) {
                         const contentSpan = document.createElement('span');
                         contentSpan.className = 'message-content';
+                        // Use innerHTML to allow for basic formatting if needed, but escape for safety
+                        // For now, just textContent as per original, but keep in mind for future enhancements
                         contentSpan.textContent = msgContent.text;
                         messageDiv.appendChild(contentSpan);
                     }
 
                     // Handle missed call rendering
+                    // These message types are purely informational and don't have associated files
+                    // so no download button is needed for them.
+                    let messageDownloadUrl = null;
+                    let messageDownloadFileName = null;
+                    if (msgContent.imageUrl) { messageDownloadUrl = msgContent.imageUrl; messageDownloadFileName = msgContent.fileName || 'image.jpg'; }
+                    else if (msgContent.videoUrl) { messageDownloadUrl = msgContent.videoUrl; messageDownloadFileName = msgContent.fileName || 'video.mp4'; }
+                    else if (msgContent.audioUrl) { messageDownloadUrl = msgContent.audioUrl; messageDownloadFileName = msgContent.fileName || 'audio.webm'; }
+                    // For generic files (fileUrl), the download button is handled directly in the fileUrl block
+
                     if (msgContent.type === 'missed_call') {
                         const contentSpan = document.createElement('span');
                         contentSpan.className = 'message-content';
@@ -2912,7 +2957,7 @@
                     return messageDiv;
                 };
                 const createMetaElement = () => {
-                    const metaDiv = document.createElement('div');
+                    const metaDiv = document.createElement('div'); // This is the main meta container
                     metaDiv.className = 'message-meta';
                     
                     // This inner div will hold the right-aligned items
@@ -2928,6 +2973,17 @@
                     }
                     metaRightDiv.appendChild(dateSpan);
 
+                    // Add download button for media types (image, video, audio)
+                    let downloadUrl = null;
+                    let downloadFileName = null;
+                    if (content.imageUrl) { downloadUrl = content.imageUrl; downloadFileName = content.fileName || 'image.jpg'; }
+                    else if (content.videoUrl) { downloadUrl = content.videoUrl; downloadFileName = content.fileName || 'video.mp4'; }
+                    else if (content.audioUrl) { downloadUrl = content.audioUrl; downloadFileName = content.fileName || 'audio.webm'; } // This was correct
+                    
+                    if (downloadUrl) {
+                        metaRightDiv.prepend(createDownloadButton(downloadUrl, downloadFileName)); // Prepend to metaRightDiv
+                    }
+
                     const timeSpan = document.createElement('span');
                     timeSpan.className = 'message-timestamp';
                     timeSpan.textContent = timeString;
@@ -2937,6 +2993,56 @@
 
                     return { main: metaDiv, right: metaRightDiv };
                 };
+
+                // Helper function to force a download prompt
+                const forceDownload = async (url, filename) => {
+                    try {
+                        // For data URLs, we can convert them to a blob directly
+                        const response = await fetch(url);
+                        const blob = await response.blob();
+                        const blobUrl = window.URL.createObjectURL(blob);
+
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = blobUrl;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(blobUrl);
+                        a.remove();
+                    } catch (error) {
+                        console.error('Download failed, falling back to direct link:', error);
+                        // Fallback for safety: open in a new tab
+                        window.open(url, '_blank');
+                    }
+                };
+
+                // Helper function to create a download button
+                const createDownloadButton = (url, filename, messageId) => {
+                    const downloadBtn = document.createElement('button'); // Changed to button
+                    downloadBtn.className = 'download-button';
+                    downloadBtn.title = 'Download File';
+                    downloadBtn.innerHTML = '⬇️';
+                    downloadBtn.dataset.messageId = messageId; // Store message ID
+
+                    downloadBtn.onclick = (e) => {
+                        e.preventDefault(); // Prevent any default action
+                        const msgId = e.currentTarget.dataset.messageId;
+
+                        if (downloadedMessageIds.has(msgId)) {
+                            if (confirm('This file has already been downloaded. Do you want to download it again?')) {
+                                forceDownload(url, filename);
+                            }
+                        } else {
+                            forceDownload(url, filename);
+                            e.currentTarget.innerHTML = '✓'; // Change to tick mark
+                            e.currentTarget.title = 'Downloaded';
+                            downloadedMessageIds.add(msgId);
+                        }
+                    };
+                    return downloadBtn;
+                };
+
 
                 // Create message for Raushan's window
                 const raushanMessage = createMessageElement({ ...content });
@@ -2953,11 +3059,11 @@
                         raushanMessage.statusElement.innerHTML = '✓'; // Sent (single check)
                         senderMetaRight.appendChild(raushanMessage.statusElement);
                     }
-                    // If it's an audio message, add the duration to the meta section
+                    // If it's an audio message, add the duration to the meta section (left side)
                     if (raushanMessage.audioDurationElement) {
                         senderMeta.prepend(raushanMessage.audioDurationElement); // Add to the main meta div on the left
                     }
-                    raushanMessage.appendChild(senderMeta);
+                    raushanMessage.appendChild(senderMeta); // This was correct
 
                     const handleSeen = () => {
                         raushanMessage.statusElement.innerHTML = '✓✓';
@@ -2980,7 +3086,7 @@
                     if (isSeen) handleSeen();
 
                     // Add meta to receiver's message (without status)
-                    const { main: receiverMetaForNisha } = createMetaElement();
+                    const { main: receiverMetaForNisha } = createMetaElement(); // No status for receiver
                     if (nishaMessage.audioDurationElement) {
                         receiverMetaForNisha.prepend(nishaMessage.audioDurationElement); // Add to the main meta div on the left
                     }
@@ -2991,7 +3097,7 @@
                     nishaMessage.classList.add('sent');
 
                     // Add meta to receiver's message (without status)
-                    const { main: receiverMetaForRaushan } = createMetaElement();
+                    const { main: receiverMetaForRaushan } = createMetaElement(); // No status for receiver
                     if (raushanMessage.audioDurationElement) {
                         receiverMetaForRaushan.prepend(raushanMessage.audioDurationElement); // Add to the main meta div on the left
                     }
@@ -3003,7 +3109,7 @@
                         nishaMessage.statusElement.innerHTML = '✓'; // Sent (single check)
                         senderMetaRight.appendChild(nishaMessage.statusElement);
                     }
-                    // If it's an audio message, add the duration to the meta section
+                    // If it's an audio message, add the duration to the meta section (left side)
                     if (nishaMessage.audioDurationElement) {
                         senderMeta.prepend(nishaMessage.audioDurationElement); // Add to the main meta div on the left
                     }
@@ -3206,15 +3312,18 @@
                 if (!activeUserForAttachment || !attachedFileUrl) return;
 
                 const content = {};
+                // Ensure fileName is always included for download attribute
                 if (attachedFileType.startsWith('video/')) {
                     content.videoUrl = attachedFileUrl;
+                    content.fileName = attachedFileName;
                 } else if (attachedFileType.startsWith('image/')) {
                     content.imageUrl = attachedFileUrl;
+                    content.fileName = attachedFileName;
                 } else { // It's another file type
                     content.fileUrl = attachedFileUrl;
                     content.fileName = attachedFileName;
                 }
-
+                
                 const messageData = { 
                     sender: activeUserForAttachment, 
                     content, 
@@ -3351,7 +3460,7 @@
 
                 const messageData = {
                     sender: activeUserForAttachment,
-                    content: { imageUrl: capturedImageDataUrl },
+                    content: { imageUrl: capturedImageDataUrl, fileName: 'captured_photo.jpeg' }, // Add fileName
                             timeString: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             recipient: activeUserForAttachment === 'raushan' ? 'nisha' : 'raushan'
                 };
@@ -3448,7 +3557,7 @@
                         const base64Audio = reader.result;
                         const messageData = {
                             sender: user,
-                            content: { audioUrl: base64Audio }, // This was correct
+                            content: { audioUrl: base64Audio, fileName: 'voice_message.webm' }, // Add fileName
                             recipient: user === 'raushan' ? 'nisha' : 'raushan',
                             timeString: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         };
