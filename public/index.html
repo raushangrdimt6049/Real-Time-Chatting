@@ -3860,8 +3860,8 @@
                     console.log("Contact Picker API failed, trying Android interface...");
                     window.Android.getContacts();
                 } else {
-                    // Don't show an alert here, as the user might have just cancelled the picker.
-                    console.log("Contact Picker API failed and no Android interface was found.");
+                    // If the API fails for a reason other than the user cancelling, and there's no fallback, inform the user.
+                    alert("Could not open contacts. This feature may not be supported in this application environment.");
                 }
             }
             
