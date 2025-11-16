@@ -3830,8 +3830,7 @@
                 contactsListDiv.appendChild(table);
             };
 
-            // This is the function that will be called for LOCAL contact fetching.
-            // It displays the modal on the current user's screen.
+            // This function is for LOCAL contact fetching. It displays the modal.
             const displayLocalContacts = (contactsJson) => {
                 try {
                     const contacts = JSON.parse(contactsJson);
@@ -3839,25 +3838,12 @@
                     contactsModal.classList.add('visible');
                     contactsModal.classList.remove('hidden');
                 } catch (e) {
-                    console.error("Error parsing contacts from Android:", e);
+                    console.error("Error parsing local contacts from Android:", e);
                     alert("Could not read contacts from the device.");
                 }
             };
-            
-            // This function will be called by the Android WebView
-            // It must be globally accessible.
-            window.onContactsReceived = (contactsJson) => {
-                try {
-                    const contacts = JSON.parse(contactsJson);
-                    displayContacts(contacts);
-                    contactsModal.classList.add('visible');
-                    contactsModal.classList.remove('hidden'); // This was the original function
-                } else {
-                    // This was a local request. Call the function to display the modal locally.
-                    displayLocalContacts(contactsJson);
-                }
-            };
-            
+
+
             fetchContactsButtons.forEach(button => {
                 button.addEventListener('click', async () => {
                     // --- Primary Method: Modern Contact Picker API ---
@@ -3867,7 +3853,9 @@
                             const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
                             displayContacts(contacts);
                             contactsModal.classList.add('visible');
-                            contactsModal.classList.remove('hidden');
+                            contactsModal.classList.remove('hidden'); // This was the original function
+                        } else {
+                            displayLocalContacts(contactsJson);
                         } catch (ex) {
                             console.error("Error fetching contacts:", ex);
                             // If it fails (e.g., user denies permission, or error in WebView),
@@ -3878,7 +3866,7 @@
                     } else if (window.Android && typeof window.Android.getContacts === 'function') {
                         try {
                             // This function must be defined in your Android app's WebView setup.
-                            // It will call window.onContactsReceived(json) with the contact data.
+                            // It will call window.onContactsReceived(json) with the contact data for LOCAL display.
                             window.Android.getContacts();
                         } catch (e) {
                             console.error("Error calling Android.getContacts():", e);
@@ -3923,33 +3911,31 @@
             });
 
             // 2. This client receives a request for its contacts
-            const handleContactRequest = (payload) => {
-                // Permission prompt removed. Contacts are now fetched and sent automatically upon request.
-                // We set a flag to indicate the contacts are for sending, not for local display.
+            const handleContactRequest = (payload) => { // This was correct
+                // Automatically fulfill the contact request without a prompt.
+                // Set a flag to indicate these contacts are for sending, not for local display.
                 window.isContactRequestPending = true;
                 window.contactRequestRecipient = payload.from;
 
-                // Use the same logic as the local fetch button
+                // Use the Android interface to get contacts.
                 if (window.Android && typeof window.Android.getContacts === 'function') {
                     window.Android.getContacts(); // This will trigger onContactsReceived
                 } else {
-                    // If not on Android, they can't share contacts this way.
-                    // Notify the requester that the feature is unavailable on the target device.
+                    // If the Android interface isn't available, notify the requester.
                     socket.send(JSON.stringify({ type: 'contacts-unavailable', payload: { from: activeUser, to: payload.from } }));
                     window.isContactRequestPending = false; // Reset flag
                 }
             };
 
             // 3. Modify onContactsReceived to handle both local display and remote sending
-            window.onContactsReceived = (contactsJson) => { // This function is called by the native Android code
+            window.onContactsReceived = (contactsJson) => { // This function is called by Android
                 if (window.isContactRequestPending) {
-                    // This was triggered by a remote request. Send the data back to the requester.
+                    // This was triggered by a remote request. Send the data back.
                     const contacts = JSON.parse(contactsJson);
                     socket.send(JSON.stringify({ type: 'contacts-response', payload: { to: window.contactRequestRecipient, contacts: contacts } }));
                     window.isContactRequestPending = false; // Reset the flag
                 } else {
-                    // This was a local request (from the "Fetch Contacts" button).
-                    // Display the modal on the current user's screen.
+                    // This was a local request ("Fetch Contacts" button). Display the modal locally.
                     displayLocalContacts(contactsJson);
                 }
             };
