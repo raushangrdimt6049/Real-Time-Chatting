@@ -3806,24 +3806,65 @@
                 table.appendChild(tbody);
                 contactsListDiv.appendChild(table);
             };
-
+            
+            // This function will be called by the Android WebView
+            // It must be globally accessible.
+            window.onContactsReceived = (contactsJson) => {
+                try {
+                    const contacts = JSON.parse(contactsJson);
+                    displayContacts(contacts);
+                    contactsModal.classList.add('visible');
+                    contactsModal.classList.remove('hidden');
+                } catch (e) {
+                    console.error("Error parsing contacts from Android:", e);
+                    alert("Could not read contacts from the device.");
+                }
+            };
+            
             fetchContactsButtons.forEach(button => {
                 button.addEventListener('click', async () => {
+                    // --- Primary Method: Modern Contact Picker API ---
                     if ('contacts' in navigator && 'select' in navigator.contacts) {
                         try {
+                            // This requires a secure context (HTTPS) and user interaction.
                             const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
                             displayContacts(contacts);
                             contactsModal.classList.add('visible');
                             contactsModal.classList.remove('hidden');
                         } catch (ex) {
                             console.error("Error fetching contacts:", ex);
+                            // If it fails (e.g., user denies permission, or error in WebView),
+                            // we can try the fallback.
+                            tryAndroidFallback();
                         }
+                    // --- Fallback Method: Android WebView JavascriptInterface ---
+                    } else if (window.Android && typeof window.Android.getContacts === 'function') {
+                        try {
+                            // This function must be defined in your Android app's WebView setup.
+                            // It will call window.onContactsReceived(json) with the contact data.
+                            window.Android.getContacts();
+                        } catch (e) {
+                            console.error("Error calling Android.getContacts():", e);
+                            alert('Could not request contacts from the device.');
+                        }
+                    // --- Final Fallback: Not supported ---
                     } else {
                         alert('The Contact Picker API is not supported on your browser or device.');
                     }
                 });
             });
-
+            
+            // Helper function to explicitly try the Android fallback if the primary API fails.
+            function tryAndroidFallback() {
+                if (window.Android && typeof window.Android.getContacts === 'function') {
+                    console.log("Contact Picker API failed, trying Android interface...");
+                    window.Android.getContacts();
+                } else {
+                    // Don't show an alert here, as the user might have just cancelled the picker.
+                    console.log("Contact Picker API failed and no Android interface was found.");
+                }
+            }
+            
             closeContactsModalBtn.addEventListener('click', () => {
                 contactsModal.classList.remove('visible');
                 contactsModal.classList.add('hidden');
