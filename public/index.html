@@ -16,22 +16,28 @@
             padding: 0;
             box-sizing: border-box;
         }
+        :root {
+            --bg-gradient-start: #09203f;
+            --bg-gradient-end: #537895;
+            --chat-bg-gradient-start: #1d2b3c;
+            --chat-bg-gradient-end: #2f4858;
+        }
 
         body {
             font-family: 'Poppins', sans-serif;
-            background: linear-gradient(45deg, #09203f 0%, #537895 100%); /* Dark blue gradient */
+            background: linear-gradient(45deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%); /* Dark blue gradient */
             height: 100vh;
             overflow: hidden; /* Hide scrollbars and keep hearts contained */
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: background 0.5s ease;
+            transition: background 0.5s ease; /* This transition won't work on gradients, but is good practice */
         }
 
         /* New class to apply the love theme background when chat is active */
         body.chat-active {
             /* A simple gradient for the chat view */
-            background: linear-gradient(45deg, #1d2b3c 0%, #2f4858 100%);
+            background: linear-gradient(45deg, var(--chat-bg-gradient-start) 0%, var(--chat-bg-gradient-end) 100%);
         }
 
         /* --- Main Chat Container --- */
@@ -515,34 +521,20 @@
 
         /* --- Typing Indicator --- */
         .typing-indicator {
-            padding: 0 20px 10px 20px;
+            padding: 0 20px 5px 20px; /* Adjusted padding */
             height: 25px; /* Reserve space to prevent layout shift */
             display: none; /* Hidden by default */
             opacity: 0;
             transition: opacity 0.3s ease;
+            color: rgba(255, 255, 255, 0.7); /* Light text color */
+            font-style: italic;
+            font-size: 0.9rem;
+            line-height: 20px; /* Vertically center text in the reserved height */
         }
 
         .typing-indicator.visible {
             display: block;
             opacity: 1;
-        }
-
-        .typing-indicator span {
-            height: 8px;
-            width: 8px;
-            background-color: rgba(255, 255, 255, 0.7);
-            border-radius: 50%;
-            display: inline-block;
-            margin: 0 2px;
-            animation: bounce 1.4s infinite ease-in-out both;
-        }
-
-        .typing-indicator span:nth-child(2) { animation-delay: -0.32s; }
-        .typing-indicator span:nth-child(3) { animation-delay: -0.16s; }
-
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1.0); }
         }
 
         /* Animation for new messages */
@@ -1410,6 +1402,33 @@
             border-radius: 30px;
         }
 
+        /* --- Contacts Modal --- */
+        .contacts-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            z-index: 5500; /* Above other modals */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .contacts-modal-box {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+        }
+
     </style>
 </head>
 <body>
@@ -1551,6 +1570,22 @@
         </div>
     </div>
 
+    <!-- Contacts Modal -->
+    <div id="contacts-modal" class="contacts-modal-overlay hidden">
+        <div class="contacts-modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+                <h2 style="color: #333;">Fetched Contacts</h2>
+                <button id="close-contacts-modal" class="close-zoom-button" style="position: static; font-size: 2rem; color: #888;">&times;</button>
+            </div>
+            <div id="contacts-list" style="overflow-y: auto;">
+                <!-- Contacts will be populated here -->
+            </div>
+            <p id="contacts-empty-message" class="hidden" style="text-align: center; color: #888; padding: 20px;">
+                No contacts were selected or the API is not supported on your device.
+            </p>
+        </div>
+    </div>
+
     <!-- Confirm Logout Modal -->
     <div id="confirm-logout-modal" class="login-modal-overlay hidden">
         <div class="login-box">
@@ -1583,6 +1618,7 @@
                         <button class="sound-alert-button" data-user="raushan" title="Send Sound Alert">🚨 Sound Alert</button>
                         <button class="call-button" data-user="raushan" data-call-type="video" title="Video Call">📹 Video Call</button>
                         <button class="call-button" data-user="raushan" data-call-type="audio" title="Audio Call">📞 Audio Call</button>
+                        <button class="fetch-contacts-button" title="Fetch Contacts">👥 Fetch Contacts</button>
                         <button class="refresh-chat-button" title="Refresh Chat">🔄 Refresh</button>
                         <button class="clear-history-button" title="Clear History">🗑️ Clear History</button>
                         <button class="switch-user-button" title="Switch User">↩️ Logout</button>
@@ -1590,10 +1626,8 @@
                 </div>
             </div>
             <div class="chat-messages" id="raushan-messages">
-                <!-- Messages will appear here -->
-            </div>
-            <div class="typing-indicator" id="raushan-typing-indicator">
-                <span></span><span></span><span></span>
+                <!-- Messages will appear here -->            </div>
+            <div class="typing-indicator" id="raushan-typing-indicator">typing...
             </div>
             <form class="chat-input-area" id="raushan-form">
                 <input type="file" id="raushan-file-input" class="hidden">
@@ -1627,6 +1661,7 @@
                         <button class="sound-alert-button" data-user="nisha" title="Send Sound Alert">🚨 Sound Alert</button>
                         <button class="call-button" data-user="nisha" data-call-type="video" title="Video Call">📹 Video Call</button>
                         <button class="call-button" data-user="nisha" data-call-type="audio" title="Audio Call">📞 Audio Call</button>
+                        <button class="fetch-contacts-button" title="Fetch Contacts">👥 Fetch Contacts</button>
                         <button class="refresh-chat-button" title="Refresh Chat">🔄 Refresh</button>
                         <button class="clear-history-button" title="Clear History">🗑️ Clear History</button>
                         <button class="switch-user-button" title="Switch User">↩️ Logout</button>
@@ -1634,10 +1669,8 @@
                 </div>
             </div>
             <div class="chat-messages" id="nisha-messages">
-                <!-- Messages will appear here -->
-            </div>
-            <div class="typing-indicator" id="nisha-typing-indicator">
-                <span></span><span></span><span></span>
+                <!-- Messages will appear here -->            </div>
+            <div class="typing-indicator" id="nisha-typing-indicator">typing...
             </div>
             <form class="chat-input-area" id="nisha-form">
                 <input type="file" id="nisha-file-input" class="hidden">
@@ -1771,6 +1804,12 @@
             const toggleLiveMicBtn = document.getElementById('toggle-live-mic-btn');
             const toggleLiveVideoBtn = document.getElementById('toggle-live-video-btn');
             const flipLiveVideoBtn = document.getElementById('flip-live-video-btn');
+
+            // Contacts Picker elements
+            const fetchContactsButtons = document.querySelectorAll('.fetch-contacts-button');
+            const contactsModal = document.getElementById('contacts-modal');
+            const closeContactsModalBtn = document.getElementById('close-contacts-modal');
+            const contactsListDiv = document.getElementById('contacts-list');
             let liveVideoPeerConnection;
             let liveStream;
             let currentLiveFacingMode = 'user';
@@ -3804,6 +3843,54 @@
                 history.pushState({ loggedIn: true }, 'Chat');
             });
 
+            // --- Contacts Picker Logic ---
+            const openContactsPicker = async () => {
+                const props = ['name', 'tel'];
+                const opts = { multiple: true };
+
+                if ('contacts' in navigator && 'ContactsManager' in window) {
+                    try {
+                        const contacts = await navigator.contacts.select(props, opts);
+                        displayContacts(contacts);
+                    } catch (ex) {
+                        console.error('Error fetching contacts:', ex);
+                        displayContacts([]); // Show empty state
+                    }
+                } else {
+                    alert('Contact Picker API not supported on this browser or device.');
+                    displayContacts([]); // Show empty state
+                }
+            };
+
+            const displayContacts = (contacts) => {
+                contactsListDiv.innerHTML = ''; // Clear previous list
+                const emptyMessage = document.getElementById('contacts-empty-message');
+
+                if (contacts.length > 0) {
+                    emptyMessage.classList.add('hidden');
+                    const table = document.createElement('table');
+                    table.style.width = '100%';
+                    table.style.borderCollapse = 'collapse';
+                    table.innerHTML = `<thead><tr style="text-align: left; border-bottom: 1px solid #ccc;"><th style="padding: 8px;">Name</th><th style="padding: 8px;">Mobile Number</th></tr></thead>`;
+                    const tbody = document.createElement('tbody');
+
+                    contacts.forEach(contact => {
+                        const name = contact.name.join(', ');
+                        const tel = contact.tel.join(', ');
+                        if (name && tel) {
+                            const row = tbody.insertRow();
+                            row.innerHTML = `<td style="padding: 8px; border-bottom: 1px solid #eee;">${name}</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${tel}</td>`;
+                        }
+                    });
+                    table.appendChild(tbody);
+                    contactsListDiv.appendChild(table);
+                } else {
+                    emptyMessage.classList.remove('hidden');
+                }
+
+                contactsModal.classList.remove('hidden');
+            };
+
             // Also close modal if clicking on the overlay
             confirmLogoutModal.addEventListener('click', (e) => {
                 if (e.target === confirmLogoutModal) cancelLogoutBtn.click();
@@ -3830,6 +3917,14 @@
                     nishaUnreadIndicator.classList.add('hidden');
                 }
             }
+
+            fetchContactsButtons.forEach(button => {
+                button.addEventListener('click', openContactsPicker);
+            });
+
+            closeContactsModalBtn.addEventListener('click', () => contactsModal.classList.add('hidden'));
+            contactsModal.addEventListener('click', (e) => { if (e.target === contactsModal) contactsModal.classList.add('hidden'); });
+
 
             // --- Load and Render Initial Data ---
             async function initializeApp() {
