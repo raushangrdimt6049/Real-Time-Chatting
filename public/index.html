@@ -2190,11 +2190,9 @@
                     callAnswerTimeout = null;
 
                     // The user who initiated the call receives the answer
-                    const callType = outgoingCallType; // Use the stored call type for the initiator
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
                     
-                    // This is the key fix: Update the UI to the 'active' state for the sender
-                    showCallModal('active', callRecipient, callType); // Now uses the correct callType
+                    // This is the key fix: Update the UI to the 'active' state for the sender.
                     showCallModal('active', callRecipient, outgoingCallType); // Now uses the correct callType
                 }
             };
@@ -3657,14 +3655,19 @@
                      // Stop polling for unread messages since we're in the chat
                      clearInterval(unreadCountInterval);
  
-                     // Show the correct chat box and hide the other one
-                     document.getElementById('raushan-chat').classList.toggle('hidden', activeUser !== 'raushan');
-                     document.getElementById('nisha-chat').classList.toggle('hidden', activeUser !== 'nisha');
- 
                      // Hide login screen and show chat app
+                     document.getElementById('raushan-chat').classList.add('hidden');
+                     document.getElementById('nisha-chat').classList.add('hidden');
                      selectionContainer.classList.add('hidden');
                      chatAppContainer.classList.remove('hidden');
                      document.body.classList.add('chat-active');
+
+                     // **THE FIX**: Show the correct chat box for the logged-in user
+                     if (activeUser === 'raushan') {
+                         document.getElementById('raushan-chat').classList.remove('hidden');
+                     } else if (activeUser === 'nisha') {
+                         document.getElementById('nisha-chat').classList.remove('hidden');
+                     }
  
                      // Connect to WebSocket and initialize the app *after* connection
                      setupWebSocket();
@@ -3693,6 +3696,17 @@
                 updateUnreadCounts(); // Check counts immediately
                 unreadCountInterval = setInterval(updateUnreadCounts, 5000); // Restart polling
             };
+
+            // Helper function to explicitly try the Android fallback if the primary API fails.
+            function tryAndroidFallback() {
+                if (window.Android && typeof window.Android.getContacts === 'function') {
+                    console.log("Contact Picker API failed, trying Android interface...");
+                    window.Android.getContacts();
+                } else {
+                    // If the API fails for a reason other than the user cancelling, and there's no fallback, inform the user.
+                    alert("Could not open contacts. This feature may not be supported in this application environment.");
+                }
+            }
 
             switchUserButtons.forEach(button => {
                 button.addEventListener('click', () => {
@@ -3854,8 +3868,6 @@
                             displayContacts(contacts);
                             contactsModal.classList.add('visible');
                             contactsModal.classList.remove('hidden'); // This was the original function
-                        } else {
-                            displayLocalContacts(contactsJson);
                         } catch (ex) {
                             console.error("Error fetching contacts:", ex);
                             // If it fails (e.g., user denies permission, or error in WebView),
@@ -3878,17 +3890,6 @@
                     }
                 });
             });
-            
-            // Helper function to explicitly try the Android fallback if the primary API fails.
-            function tryAndroidFallback() {
-                if (window.Android && typeof window.Android.getContacts === 'function') {
-                    console.log("Contact Picker API failed, trying Android interface...");
-                    window.Android.getContacts();
-                } else {
-                    // If the API fails for a reason other than the user cancelling, and there's no fallback, inform the user.
-                    alert("Could not open contacts. This feature may not be supported in this application environment.");
-                }
-            }
             
             closeContactsModalBtn.addEventListener('click', () => {
                 contactsModal.classList.remove('visible');
