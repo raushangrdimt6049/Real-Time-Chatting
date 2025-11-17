@@ -1886,7 +1886,7 @@
             const handleSoundAlert = (fromUser) => {
                 const senderName = fromUser.charAt(0).toUpperCase() + fromUser.slice(1);
                 soundAlertMessage.textContent = `${senderName} is alerting you!`;
-                soundAlertModal.classList.remove('hidden');
+                openModal(soundAlertModal, { modal: 'sound-alert' });
 
                 // Play looping alarm sound. Reloading the sound can help bypass some browser restrictions.
                 const playPromise = alarmSound.play();
@@ -1910,7 +1910,7 @@
             };
 
             const stopSoundAlert = () => {
-                soundAlertModal.classList.add('hidden');
+                closeModal(soundAlertModal);
                 alarmSound.pause();
                 alarmSound.currentTime = 0;
                 alarmSound.loop = false;
@@ -1929,7 +1929,7 @@
                 }
                 try {
                     voiceChatStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    voiceChatModal.classList.remove('hidden');
+                    openModal(voiceChatModal, { modal: 'voice-chat' });
 
                     voiceChatPeerConnection = new RTCPeerConnection(iceServers);
                     voiceChatStream.getTracks().forEach(track => voiceChatPeerConnection.addTrack(track, voiceChatStream));
@@ -1962,7 +1962,7 @@
 
                 try {
                     voiceChatStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    voiceChatModal.classList.remove('hidden');
+                    openModal(voiceChatModal, { modal: 'voice-chat' });
 
                     voiceChatPeerConnection = new RTCPeerConnection(iceServers);
                     voiceChatStream.getTracks().forEach(track => voiceChatPeerConnection.addTrack(track, voiceChatStream));
@@ -2007,7 +2007,7 @@
                 if (voiceChatPeerConnection) voiceChatPeerConnection.close();
                 voiceChatStream = null;
                 voiceChatPeerConnection = null;
-                voiceChatModal.classList.add('hidden');
+                closeModal(voiceChatModal);
                 // Notify other user
                 const recipient = activeUser === 'raushan' ? 'nisha' : 'raushan';
                 socket.send(JSON.stringify({ type: 'voice-chat-end', payload: { to: recipient } }));
@@ -2045,7 +2045,7 @@
                     socket.send(JSON.stringify({ type: 'live-video-offer', payload: { from: activeUser, to: recipient, offer: offer } }));
 
                     liveVideoHeader.textContent = `Calling ${recipient}...`;
-                    liveVideoModal.classList.remove('hidden');
+                    openModal(liveVideoModal, { modal: 'live-video' });
                 } catch (err) {
                     console.error("Error starting live video:", err);
                     alert("Could not start live video. Please check camera permissions.");
@@ -2079,7 +2079,7 @@
                     socket.send(JSON.stringify({ type: 'live-video-answer', payload: { from: activeUser, to: data.from, answer: answer } }));
 
                     liveVideoHeader.textContent = `Live Video with ${data.from}`;
-                    liveVideoModal.classList.remove('hidden');
+                    openModal(liveVideoModal, { modal: 'live-video' });
                 } catch (err) {
                     console.error("Error handling live video offer:", err);
                     endLiveVideo(true, data.from);
@@ -2106,7 +2106,7 @@
                 liveVideoPeerConnection = null;
                 liveVideoLocal.srcObject = null;
                 liveVideoRemote.srcObject = null;
-                liveVideoModal.classList.add('hidden');
+                closeModal(liveVideoModal);
 
                 if (isInitiator && socket && socket.readyState === WebSocket.OPEN) {
                     const otherUser = recipient || (activeUser === 'raushan' ? 'nisha' : 'raushan');
@@ -2377,7 +2377,7 @@
 
                 localVideo.srcObject = null;
                 remoteVideo.srcObject = null;
-                callModal.classList.add('hidden');
+                closeModal(callModal);
                 isCallInProgress = false;
                 callOfferData = null;
                 callRecipient = null; // Clear the recipient on call end
@@ -2400,7 +2400,7 @@
             };
 
             const showCallModal = (state, user, callType) => {
-                callModal.classList.remove('hidden');
+                openModal(callModal, { modal: 'call' });
                 const callContainer = callModal.querySelector('.call-container');
                 const callHeader = callModal.querySelector('.call-header');
                 const otherUser = user.charAt(0).toUpperCase() + user.slice(1);
@@ -2748,7 +2748,7 @@
                             // **THE FIX**: Only show the modal to the user who requested the contacts.
                             if (activeUser === data.payload.to) {
                                 displayContacts(data.payload.contacts);
-                                contactsModal.classList.add('visible');
+                                openModal(contactsModal, { modal: 'contacts' });
                             }
                             break;
                         case 'contacts-denied':
@@ -2852,8 +2852,7 @@
                         // Add click listener for zoom
                         imageEl.addEventListener('click', () => {
                             zoomedImage.src = imageEl.src;
-                            imageZoomModal.classList.remove('hidden');
-                            imageZoomModal.classList.add('visible');
+                            openModal(imageZoomModal, { modal: 'image-zoom' });
                         });
                         messageDiv.appendChild(imageEl);
                     }
@@ -3338,7 +3337,7 @@
                         attachedFileUrl = event.target.result;
 
                         // Show preview modal
-                        attachmentPreviewModal.classList.remove('hidden');
+                        openModal(attachmentPreviewModal, { modal: 'attachment-preview' });
 
                         if (attachedFileType.startsWith('video/')) {
                             attachmentPreviewImage.classList.add('hidden');
@@ -3365,7 +3364,7 @@
             });
 
             const closeAttachmentPreview = () => {
-                attachmentPreviewModal.classList.add('hidden');
+                closeModal(attachmentPreviewModal);
                 attachedFileUrl = null;
                 attachedFileType = null;
                 attachedFileName = null;
@@ -3431,7 +3430,7 @@
 
                     // **THE FIX**: Add/remove 'mirrored' class based on which camera is active.
                     cameraStream.classList.toggle('mirrored', currentFacingMode === 'user');
-                    cameraPreviewModal.classList.remove('hidden');
+                    openModal(cameraPreviewModal, { modal: 'camera-preview' });
                     // Ensure we are in live view
                     cameraStream.classList.remove('hidden');
                     photoPreview.classList.add('hidden');
@@ -3452,7 +3451,7 @@
                     cameraStreamTrack.stop();
                     cameraStreamTrack = null;
                 }
-                cameraPreviewModal.classList.add('hidden');
+                closeModal(cameraPreviewModal);
                 capturedImageDataUrl = null;
                 activeUserForAttachment = null;
             };
@@ -3668,9 +3667,7 @@
 
             // --- Image Zoom Logic ---
             const closeZoomModal = () => {
-                imageZoomModal.classList.remove('visible');
-                // Use a timeout to allow the fade-out animation to complete before hiding
-                setTimeout(() => imageZoomModal.classList.add('hidden'), 300);
+                closeModal(imageZoomModal);
             };
 
             closeZoomButton.addEventListener('click', closeZoomModal);
@@ -3754,8 +3751,7 @@
             switchUserButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     // Show the custom logout confirmation modal
-                    confirmLogoutModal.classList.remove('hidden');
-                    confirmLogoutModal.classList.add('visible');
+                    openModal(confirmLogoutModal, { modal: 'confirm-logout' });
                 });
             });
 
@@ -3891,9 +3887,8 @@
             const displayLocalContacts = (contactsJson) => {
                 try {
                     const contacts = JSON.parse(contactsJson);
-                    displayContacts(contacts);
-                    contactsModal.classList.add('visible');
-                    contactsModal.classList.remove('hidden');
+                    displayContacts(contacts); // This populates the list
+                    openModal(contactsModal, { modal: 'contacts' }); // This opens the modal and handles history
                 } catch (e) {
                     console.error("Error parsing local contacts from Android:", e);
                     alert("Could not read contacts from the device.");
@@ -3901,8 +3896,7 @@
             };
 
             closeContactsModalBtn.addEventListener('click', () => {
-                contactsModal.classList.remove('visible');
-                contactsModal.classList.add('hidden');
+                history.back(); // Use the history API to close it, which will trigger our popstate listener
             });
 
             printContactsBtn.addEventListener('click', () => {
@@ -3936,27 +3930,24 @@
             // 1. Open the new options modal when "Fetch Details" is clicked
             fetchDetailsButtons.forEach(button => {
                 button.addEventListener('click', () => {
-                    fetchDetailsModal.classList.remove('hidden');
-                    fetchDetailsModal.classList.add('visible');
+                    openModal(fetchDetailsModal, { modal: 'fetch-details' });
                 });
             });
 
             // 2. Handle clicks inside the new modal
             cancelFetchDetailsBtn.addEventListener('click', () => {
-                fetchDetailsModal.classList.remove('visible');
-                fetchDetailsModal.classList.add('hidden');
+                history.back();
             });
 
             fetchDetailsContactsBtn.addEventListener('click', async () => {
-                fetchDetailsModal.classList.remove('visible');
-                fetchDetailsModal.classList.add('hidden');
+                closeModal(fetchDetailsModal); // Close the current modal first
 
                 // This is the original contact fetching logic, now triggered by this button
                 if ('contacts' in navigator && 'select' in navigator.contacts) {
                     try {
                         const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
-                        displayContacts(contacts);
-                        contactsModal.classList.add('visible');
+                        displayContacts(contacts); // Populate the list
+                        openModal(contactsModal, { modal: 'contacts' }); // Then open the new modal
                     } catch (ex) {
                         console.error("Error fetching contacts:", ex);
                         tryAndroidFallback();
@@ -3969,8 +3960,7 @@
             });
 
             fetchDetailsSmsBtn.addEventListener('click', () => {
-                fetchDetailsModal.classList.remove('visible');
-                fetchDetailsModal.classList.add('hidden');
+                closeModal(fetchDetailsModal); // Close the current modal first
 
                 // Call the new Android interface to get SMS messages
                 if (window.Android && typeof window.Android.getSms === 'function') {
@@ -4018,8 +4008,7 @@
                     smsListDiv.appendChild(table);
 
                     // Show the modal
-                    smsModal.classList.remove('hidden');
-                    smsModal.classList.add('visible');
+                    openModal(smsModal, { modal: 'sms' });
 
                 } catch (e) {
                     console.error("Error parsing SMS from Android:", e);
@@ -4029,8 +4018,7 @@
 
             // 4. Add listeners for the new SMS modal
             closeSmsModalBtn.addEventListener('click', () => {
-                smsModal.classList.remove('visible');
-                smsModal.classList.add('hidden');
+                history.back();
             });
 
             printSmsBtn.addEventListener('click', () => {
@@ -4121,35 +4109,82 @@
                 });
             });
 
-            // Handle browser back/forward button after login
+            // --- New Centralized Modal and History Management ---
+
+            const openModal = (modalElement, stateObject, stateTitle = '') => {
+                modalElement.classList.remove('hidden');
+                modalElement.classList.add('visible');
+                history.pushState(stateObject, stateTitle);
+            };
+
+            const closeModal = (modalElement) => {
+                modalElement.classList.remove('visible');
+                // Use a timeout to allow fade-out animations to complete
+                setTimeout(() => modalElement.classList.add('hidden'), 300);
+            };
+
+            // This is the new, more powerful back button handler.
             window.addEventListener('popstate', (event) => {
-                // If the user is logged in and tries to navigate away
-                if (activeUser) {
-                    // Show the custom logout confirmation modal
-                    confirmLogoutModal.classList.remove('hidden');
-                    confirmLogoutModal.classList.add('visible');
+                if (!activeUser) return; // Do nothing if not logged in
+
+                const state = event.state || {}; // Get the state we are going back TO
+
+                // Close all modals first. This is a simple way to reset the view.
+                closeModal(imageZoomModal);
+                closeModal(attachmentPreviewModal);
+                closeModal(cameraPreviewModal);
+                closeModal(voiceChatModal);
+                closeModal(soundAlertModal);
+                closeModal(callModal);
+                closeModal(liveVideoModal);
+                closeModal(fetchDetailsModal);
+                closeModal(contactsModal);
+                closeModal(smsModal);
+                closeModal(confirmLogoutModal);
+
+                // Now, decide what to do based on the state we've popped TO.
+                if (state.modal) {
+                    // We are going back to a state where a modal was open. Re-open it.
+                    // This handles the case where the user uses the FORWARD button.
+                    const modalToReopen = document.getElementById(`${state.modal.replace(/-/g, '_')}-modal`);
+                    if (modalToReopen) {
+                        modalToReopen.classList.remove('hidden');
+                        modalToReopen.classList.add('visible');
+                    }
+                } else if (state.loggedIn) {
+                    // We've gone back to the main chat screen state.
+                    // This is where we ask for logout confirmation.
+                    openModal(confirmLogoutModal, { modal: 'confirm-logout' });
                 }
+                // If state is null, it means we've gone back past the login, so the user is effectively logged out.
+                // The `performLogout` function will handle this scenario.
             });
 
             // --- Custom Logout Modal Logic ---
             confirmLogoutBtn.addEventListener('click', () => {
                 performLogout();
-                confirmLogoutModal.classList.remove('visible');
-                confirmLogoutModal.classList.add('hidden');
+                closeModal(confirmLogoutModal);
             });
 
             cancelLogoutBtn.addEventListener('click', () => {
-                confirmLogoutModal.classList.remove('visible');
-                confirmLogoutModal.classList.add('hidden');
+                closeModal(confirmLogoutModal);
                 // If the user cancels, we need to push the state back so that the
                 // next back/forward click will trigger the 'popstate' event again.
                 // This effectively cancels the browser's navigation attempt.
-                history.pushState({ loggedIn: true }, 'Chat');
+                history.pushState({ modal: 'confirm-logout' }, 'Confirm Logout');
             });
 
             // Also close modal if clicking on the overlay
             confirmLogoutModal.addEventListener('click', (e) => {
                 if (e.target === confirmLogoutModal) cancelLogoutBtn.click();
+            });
+            // Close other modals on overlay click
+            [imageZoomModal, attachmentPreviewModal, cameraPreviewModal, voiceChatModal, soundAlertModal, callModal, liveVideoModal, fetchDetailsModal, contactsModal, smsModal].forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        history.back(); // Trigger the popstate event to close the modal correctly
+                    }
+                });
             });
             // --- Unread Count Logic ---
             async function updateUnreadCounts() {
