@@ -1565,6 +1565,7 @@
             <div id="contacts-list" style="overflow-y: auto; text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
                 <!-- Contacts will be populated here -->
             </div>
+            <button id="print-contacts-btn" class="send-icon-button" style="background: #555; color: white; border-radius: 20px; padding: 10px 20px; font-size: 1rem; font-weight: 600; margin-top: 20px;">🖨️ Print Contacts</button>
         </div>
     </div>
 
@@ -1783,6 +1784,7 @@
             const closeContactsModalBtn = document.getElementById('close-contacts-modal');
             const contactsListDiv = document.getElementById('contacts-list');
             const fetchContactsButtons = document.querySelectorAll('.fetch-contacts-button');
+            const printContactsBtn = document.getElementById('print-contacts-btn');
             const viewContactsButtons = document.querySelectorAll('.view-contacts-button');
             let liveVideoPeerConnection;
             let liveStream;
@@ -3895,6 +3897,33 @@
                 contactsModal.classList.remove('visible');
                 contactsModal.classList.add('hidden');
             });
+
+            printContactsBtn.addEventListener('click', () => {
+                const printContent = document.getElementById('contacts-list').innerHTML;
+                const printWindow = window.open('', '_blank', 'height=600,width=800');
+
+                printWindow.document.write('<html><head><title>Print Contacts</title>');
+                printWindow.document.write(`
+                    <style>
+                        body { font-family: sans-serif; }
+                        table { width: 100%; border-collapse: collapse; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                        h2 { text-align: center; }
+                    </style>
+                `);
+                printWindow.document.write('</head><body>');
+                printWindow.document.write('<h2>Device Contacts</h2>');
+                printWindow.document.write(printContent);
+                printWindow.document.write('</body></html>');
+
+                printWindow.document.close(); // Necessary for some browsers
+                printWindow.focus(); // Necessary for some browsers
+
+                printWindow.print();
+                printWindow.close();
+            });
+
 
             // --- Remote Contact Sharing Logic ---
 
