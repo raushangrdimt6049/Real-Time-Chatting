@@ -4132,40 +4132,39 @@
                 history.pushState(stateObject, stateTitle);
             };
 
-            const closeModal = (modalElement) => {
+            const closeModal = (modalElement, shouldGoBack = false) => {
                 modalElement.classList.remove('visible');
                 // Use a timeout to allow fade-out animations to complete
                 setTimeout(() => modalElement.classList.add('hidden'), 300);
+                if (shouldGoBack) {
+                    // This is used when a modal is closed by a button, not the back button.
+                    // It ensures the history state matches the UI state.
+                    if (history.state && history.state.modal) {
+                        history.back();
+                    }
+                }
             };
 
             // This is the new, more powerful back button handler.
             window.onpopstate = (event) => {
-                if (!activeUser) {
-                    // If we're not logged in, a back press should do nothing special.
-                    // Let the browser handle it (e.g., exit the app if it's the last page in history).
-                    return;
-                }
-
                 // Get the state we are navigating TO.
                 const destinationState = event.state || {};
 
                 // Close all modals regardless. This ensures a clean slate.
-                [
-                    imageZoomModal, attachmentPreviewModal, cameraPreviewModal,
-                    voiceChatModal, soundAlertModal, callModal, liveVideoModal,
-                    fetchDetailsModal, contactsModal, smsModal, confirmLogoutModal
-                ].forEach(closeModal);
+                document.querySelectorAll('.login-modal-overlay, .image-zoom-modal-overlay, .camera-preview-overlay, .call-modal-overlay, .voice-chat-modal-overlay, .alert-modal-overlay, .live-video-modal-overlay').forEach(modal => {
+                    modal.classList.remove('visible');
+                    setTimeout(() => modal.classList.add('hidden'), 300);
+                });
 
-                // If the destination state is the main 'loggedIn' state, it means we were on a modal page
-                // and have now returned to the main chat. We should stop here.
-                if (destinationState.loggedIn) {
-                    // We've successfully navigated back to the chat screen. Do nothing further.
-                    return;
-                }
+                // If we are not logged in, do nothing further.
+                if (!activeUser) return;
 
-                // If the destination state is NOT the 'loggedIn' state (e.g., it's null or undefined),
-                // it means the user pressed back from the main chat screen. Now, we should ask for logout confirmation.
-                if (!destinationState.loggedIn) {
+                // If the destination state is a modal, it means the user pressed the FORWARD button.
+                // We should re-open that modal.
+                if (destinationState.modal) {
+                    const modalToReopen = document.getElementById(`${destinationState.modal}-modal`);
+                    if (modalToReopen) openModal(modalToReopen, destinationState);
+                } else if (!destinationState.loggedIn) {
                     // We've gone back to the main chat screen state.
                     // This is where we ask for logout confirmation.
                     openModal(confirmLogoutModal, { modal: 'confirm-logout' });
@@ -4181,11 +4180,10 @@
             });
 
             cancelLogoutBtn.addEventListener('click', () => {
-                closeModal(confirmLogoutModal);
                 // If the user cancels, we need to push the state back so that the
                 // next back/forward click will trigger the 'popstate' event again.
                 // This effectively cancels the browser's navigation attempt.
-                history.pushState({ modal: 'confirm-logout' }, 'Confirm Logout');
+                history.forward();
             });
 
             // Also close modal if clicking on the overlay
