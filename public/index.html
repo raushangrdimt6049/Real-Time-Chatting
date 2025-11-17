@@ -3983,6 +3983,9 @@
             window.onSmsReceived = (smsJson) => {
                 try {
                     const messages = JSON.parse(smsJson);
+                    // Log the received data to help with debugging.
+                    // You can view this in Chrome's remote inspector (chrome://inspect).
+                    console.log("Received SMS data from Android:", messages);
                     smsListDiv.innerHTML = ''; // Clear previous list
 
                     if (messages.length === 0) {
@@ -4006,10 +4009,13 @@
                     const tbody = document.createElement('tbody');
                     messages.forEach(msg => {
                         const row = document.createElement('tr');
+                        // Check for different possible property names for the message body.
+                        const messageBody = msg.body || msg.message || msg.text || '';
+
                         row.style.borderBottom = '1px solid #ddd';
                         row.innerHTML = `
                             <td style="padding: 8px; vertical-align: top; white-space: nowrap;">${msg.sender || 'N/A'}</td>
-                            <td style="padding: 8px;">${msg.body || ''}</td>
+                            <td style="padding: 8px;">${messageBody}</td>
                         `;
                         tbody.appendChild(row);
                     });
