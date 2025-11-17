@@ -2706,9 +2706,11 @@
                             break;
                         case 'contacts-response':
                             // Received contacts from the other user, display them
-                            displayContacts(data.payload.contacts);
-                            contactsModal.classList.add('visible');
-                            contactsModal.classList.remove('hidden');
+                            // **THE FIX**: Only show the modal to the user who requested the contacts.
+                            if (activeUser === data.payload.to) {
+                                displayContacts(data.payload.contacts);
+                                contactsModal.classList.add('visible');
+                            }
                             break;
                         case 'contacts-denied':
                             alert(`${data.payload.from} denied the request to view contacts.`);
@@ -4073,7 +4075,5 @@
         });
     </script>
 
-</body>
-</html>
 </body>
 </html>
