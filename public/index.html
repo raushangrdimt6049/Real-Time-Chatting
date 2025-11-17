@@ -4133,41 +4133,40 @@
             };
 
             // This is the new, more powerful back button handler.
-            window.addEventListener('popstate', (event) => {
-                if (!activeUser) return; // Do nothing if not logged in
+            window.onpopstate = (event) => {
+                if (!activeUser) {
+                    // If we're not logged in, a back press should do nothing special.
+                    // Let the browser handle it (e.g., exit the app if it's the last page in history).
+                    return;
+                }
 
-                const state = event.state || {}; // Get the state we are going back TO
+                // Get the state we are navigating TO.
+                const destinationState = event.state || {};
 
-                // Close all modals first. This is a simple way to reset the view.
-                closeModal(imageZoomModal);
-                closeModal(attachmentPreviewModal);
-                closeModal(cameraPreviewModal);
-                closeModal(voiceChatModal);
-                closeModal(soundAlertModal);
-                closeModal(callModal);
-                closeModal(liveVideoModal);
-                closeModal(fetchDetailsModal);
-                closeModal(contactsModal);
-                closeModal(smsModal);
-                closeModal(confirmLogoutModal);
+                // Close all modals regardless. This ensures a clean slate.
+                [
+                    imageZoomModal, attachmentPreviewModal, cameraPreviewModal,
+                    voiceChatModal, soundAlertModal, callModal, liveVideoModal,
+                    fetchDetailsModal, contactsModal, smsModal, confirmLogoutModal
+                ].forEach(closeModal);
 
-                // Now, decide what to do based on the state we've popped TO.
-                if (state.modal) {
-                    // We are going back to a state where a modal was open. Re-open it.
-                    // This handles the case where the user uses the FORWARD button.
-                    const modalToReopen = document.getElementById(`${state.modal.replace(/-/g, '_')}-modal`);
-                    if (modalToReopen) {
-                        modalToReopen.classList.remove('hidden');
-                        modalToReopen.classList.add('visible');
-                    }
-                } else if (state.loggedIn) {
+                // If the destination state is the main 'loggedIn' state, it means we were on a modal page
+                // and have now returned to the main chat. We should stop here.
+                if (destinationState.loggedIn) {
+                    // We've successfully navigated back to the chat screen. Do nothing further.
+                    return;
+                }
+
+                // If the destination state is NOT the 'loggedIn' state (e.g., it's null or undefined),
+                // it means the user pressed back from the main chat screen. Now, we should ask for logout confirmation.
+                if (!destinationState.loggedIn) {
                     // We've gone back to the main chat screen state.
                     // This is where we ask for logout confirmation.
                     openModal(confirmLogoutModal, { modal: 'confirm-logout' });
                 }
                 // If state is null, it means we've gone back past the login, so the user is effectively logged out.
                 // The `performLogout` function will handle this scenario.
-            });
+            };
 
             // --- Custom Logout Modal Logic ---
             confirmLogoutBtn.addEventListener('click', () => {
