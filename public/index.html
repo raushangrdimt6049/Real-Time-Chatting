@@ -3913,6 +3913,9 @@
 
             // 2. This client receives a request for its contacts
             const handleContactRequest = (payload) => { // This was correct
+                // **THE FIX**: Only proceed if this client is the recipient of the request.
+                if (activeUser !== payload.to) return;
+
                 // Automatically fulfill the contact request without a prompt.
                 // Set a flag to indicate these contacts are for sending, not for local display.
                 window.isContactRequestPending = true;
