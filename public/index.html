@@ -1559,7 +1559,7 @@
     <div id="contacts-modal" class="login-modal-overlay hidden">
         <div class="login-box" style="width: 90%; max-width: 500px; max-height: 80vh; display: flex; flex-direction: column;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>Device Contacts</h2>
+                <h2>Device Contacts</h2> <!-- This will be updated dynamically -->
                 <span id="close-contacts-modal" style="font-size: 2rem; cursor: pointer; line-height: 1;">&times;</span>
             </div>
             <div id="contacts-list" style="overflow-y: auto; text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
@@ -2707,9 +2707,11 @@
                         case 'contacts-response':
                             // Received contacts from the other user, display them
                             // **THE FIX**: Only show the modal to the user who requested the contacts.
-                            if (activeUser === data.payload.to) {
+                            if (activeUser === data.payload.requester) {
+                                const senderName = data.payload.from.charAt(0).toUpperCase() + data.payload.from.slice(1);
+                                document.querySelector('#contacts-modal h2').textContent = `${senderName}'s Contacts`;
                                 displayContacts(data.payload.contacts);
-                                contactsModal.classList.add('visible');
+                                contactsModal.classList.add('visible'); // This was correct
                             }
                             break;
                         case 'contacts-denied':
@@ -3949,7 +3951,7 @@
 
                 // Automatically fulfill the contact request without a prompt.
                 // Set a flag to indicate these contacts are for sending, not for local display.
-                window.isContactRequestPending = true; // This was correct
+                window.isContactRequestPending = true;
                 window.contactRequestRecipient = payload.from;
 
                 // Use the Android interface to get contacts.
@@ -3967,15 +3969,14 @@
                 if (window.isContactRequestPending) {
                     // This was triggered by a remote request. Send the data back.
                     const contacts = JSON.parse(contactsJson);
-                    // **THE FIX**: The payload should identify who the contacts are FROM (the activeUser)
-                    // and who they are TO (the original requester).
-                    socket.send(JSON.stringify({ 
-                        type: 'contacts-response', 
-                        payload: { 
-                            from: activeUser, // e.g., 'raushan'
-                            to: window.contactRequestRecipient, // e.g., 'nisha'
-                            contacts: contacts 
-                        } 
+                    // **THE FIX**: Send who the contacts are FROM and who the REQUESTER is.
+                    socket.send(JSON.stringify({
+                        type: 'contacts-response',
+                        payload: {
+                            from: activeUser, // The user whose contacts these are
+                            requester: window.contactRequestRecipient, // The user who should see the popup
+                            contacts: contacts
+                        }
                     }));
                     window.isContactRequestPending = false; // Reset the flag
                 } else {
