@@ -3960,12 +3960,21 @@
             });
 
             fetchDetailsSmsBtn.addEventListener('click', () => {
-                closeModal(fetchDetailsModal); // Close the current modal first
+                closeModal(fetchDetailsModal);
 
-                // Call the new Android interface to get SMS messages
-                if (window.Android && typeof window.Android.getSms === 'function') {
-                    window.Android.getSms();
+                if (window.Android) {
+                    if (typeof window.Android.getSms === 'function') {
+                        // The function exists, call it.
+                        window.Android.getSms();
+                    } else {
+                        // The Android object exists, but the getSms function is missing.
+                        console.error("window.Android object found, but getSms() method is missing or not a function.");
+                        console.log("Available methods on window.Android:", Object.keys(window.Android));
+                        alert("The Android interface is available, but the SMS function is not. Please check the native app implementation.");
+                    }
                 } else {
+                    // The window.Android object itself is not found.
+                    console.error("window.Android JavaScript interface not found.");
                     alert("This feature requires a compatible Android device and application version.");
                 }
             });
