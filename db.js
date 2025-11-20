@@ -25,8 +25,8 @@ pool.on('error', (err, client) => {
 });
 
 const createTable = async () => {
-  const createTableQuery = `
-    CREATE TABLE IF NOT EXISTS messages (
+  const createAlphaTableQuery = `
+    CREATE TABLE IF NOT EXISTS alpha_messages (
       id SERIAL PRIMARY KEY,
       sender VARCHAR(50) NOT NULL,
       content JSONB NOT NULL,
@@ -34,26 +34,35 @@ const createTable = async () => {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       is_seen BOOLEAN DEFAULT FALSE,
       seen_at TIMESTAMP WITH TIME ZONE,
-      reply_to_id INTEGER REFERENCES messages(id) ON DELETE SET NULL
+      reply_to_id INTEGER REFERENCES alpha_messages(id) ON DELETE SET NULL
     );
   `;
 
-  const addColumnQuery = `
-    ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id INTEGER REFERENCES messages(id) ON DELETE SET NULL;
+  const createBetaTableQuery = `
+    CREATE TABLE IF NOT EXISTS beta_messages (
+      id SERIAL PRIMARY KEY,
+      sender VARCHAR(50) NOT NULL,
+      content JSONB NOT NULL,
+      time_string VARCHAR(50) NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      is_seen BOOLEAN DEFAULT FALSE,
+      seen_at TIMESTAMP WITH TIME ZONE,
+      reply_to_id INTEGER REFERENCES beta_messages(id) ON DELETE SET NULL
+    );
   `;
 
   try {
     // Using pool.connect() is more robust for initial setup
     const client = await pool.connect();
     try {
-      // First, ensure the table exists
-      await client.query(createTableQuery);
-      console.log('"messages" table is ready or already exists.');
+      // Drop the old table if it exists to avoid conflicts
+      await client.query('DROP TABLE IF EXISTS messages CASCADE;');
+      console.log('Dropped old "messages" table.');
 
-      // Then, ensure the new column exists.
-      // This is a simple migration strategy.
-      await client.query(addColumnQuery);
-      console.log('"reply_to_id" column is ready or already exists.');
+      await client.query(createAlphaTableQuery);
+      console.log('"alpha_messages" table is ready or already exists.');
+      await client.query(createBetaTableQuery);
+      console.log('"beta_messages" table is ready or already exists.');
 
     } finally {
       client.release();
