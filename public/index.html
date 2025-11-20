@@ -2671,36 +2671,36 @@
                                         body: JSON.stringify({ user: activeUser })
                                     });
                                 }
-                            }
+                            }                           
                             break;
                         case 'messages_seen':
                             // When messages are marked as seen, update their status ticks.
                             data.payload.forEach(seenMessage => {
                                 const elements = messageElements.get(seenMessage.id);
-                                if (elements) {
                                     // Find the sender's message element to update the status
                                     const senderMessageElement = seenMessage.sender === 'alpha' ? elements.alpha : elements.beta; // This is the sender's own message bubble
                                     const statusEl = senderMessageElement.statusElement;
                                     if (statusEl) {
                                         statusEl.innerHTML = '✓✓';
                                         statusEl.classList.add('seen');
-                                    }
-                                    // Add the seen date and time info dynamically
-                                    if (seenMessage.seen_at && !senderMessageElement.querySelector('.message-seen-info')) {
-                                        const seenInfoDiv = document.createElement('div');
-                                        seenInfoDiv.className = 'message-seen-info';
-                                        const seenDateSpan = document.createElement('span');
-                                        seenDateSpan.textContent = formatSeenDate(seenMessage.seen_at);
-                                        const seenTimeSpan = document.createElement('span');
-                                        seenTimeSpan.textContent = formatSeenTime(seenMessage.seen_at);
-                                        seenInfoDiv.appendChild(seenDateSpan);
-                                        seenInfoDiv.appendChild(seenTimeSpan);
-                                        // **THE FIX**: Use insertBefore to place the seen info inside the message bubble,
-                                        // just before the meta-data element (the timestamp and status ticks).
-                                        if (senderMessageElement.lastChild) {
-                                            senderMessageElement.insertBefore(seenInfoDiv, senderMessageElement.lastChild);
+
+                                        // Add the seen date and time info dynamically if it doesn't exist
+                                        if (seenMessage.seen_at && !senderMessageElement.querySelector('.message-seen-info')) {
+                                            const seenInfoDiv = document.createElement('div');
+                                            seenInfoDiv.className = 'message-seen-info';
+                                            const seenDateSpan = document.createElement('span');
+                                            seenDateSpan.textContent = formatSeenDate(seenMessage.seen_at);
+                                            const seenTimeSpan = document.createElement('span'); // This was correct
+                                            seenTimeSpan.textContent = formatSeenTime(seenMessage.seen_at);
+                                            seenInfoDiv.appendChild(seenDateSpan);
+                                            seenInfoDiv.appendChild(seenTimeSpan);
+
+                                            // Insert the seen info before the meta element (which contains the timestamp and status ticks)
+                                            const metaElement = senderMessageElement.querySelector('.message-meta');
+                                            if (metaElement) {
+                                                senderMessageElement.insertBefore(seenInfoDiv, metaElement);
+                                            }
                                         }
-                                    }
                                 }
                             });
                             break;
@@ -3172,7 +3172,7 @@
                             const seenDateSpan = document.createElement('span');
                             seenDateSpan.textContent = formatSeenDate(seenAt);
                             const seenTimeSpan = document.createElement('span');
-                            seenTimeSpan.textContent = formatSeenTime(seenAt); // Use the correct variable
+                            seenTimeSpan.textContent = formatSeenTime(seenAt);
                             seenInfoDiv.appendChild(seenDateSpan);
                             seenInfoDiv.appendChild(seenTimeSpan);
                             // **THE FIX**: Insert the seen info *before* the meta element (which is the last child)
@@ -3182,6 +3182,7 @@
                             }
                         }
                     };
+                    // "Seen" logic removed
 
                     if (isSeen) handleSeen();
 
@@ -3226,7 +3227,7 @@
                             const seenDateSpan = document.createElement('span');
                             seenDateSpan.textContent = formatSeenDate(seenAt);
                             const seenTimeSpan = document.createElement('span');
-                            seenTimeSpan.textContent = formatSeenTime(seenAt); // Use the correct variable
+                            seenTimeSpan.textContent = formatSeenTime(seenAt);
                             seenInfoDiv.appendChild(seenDateSpan);
                             seenInfoDiv.appendChild(seenTimeSpan);
                             // **THE FIX**: Insert the seen info *before* the meta element.
@@ -3237,6 +3238,7 @@
                     };
 
                     if (isSeen) handleSeen();
+                    // "Seen" logic removed
                 }
 
                 // Add date separators if needed
@@ -3726,9 +3728,14 @@
                      // Stop polling for unread messages since we're in the chat
                      clearInterval(unreadCountInterval);
  
+                     if (unreadCountInterval) clearInterval(unreadCountInterval); 
                      // Hide login screen and show the main chat container
                      selectionContainer.classList.add('hidden');
                      chatAppContainer.classList.remove('hidden');
+                     // Explicitly hide indicators on login
+                     document.getElementById('alpha-unread-indicator').classList.add('hidden');
+                     document.getElementById('beta-unread-indicator').classList.add('hidden');
+
                      document.body.classList.add('chat-active');
 
                      // Show ONLY the correct chat box for the logged-in user
@@ -3764,6 +3771,7 @@
 
                 updateUnreadCounts(); // Check counts immediately
                 unreadCountInterval = setInterval(updateUnreadCounts, 5000); // Restart polling
+                // Restarting unread count polling is removed
             };
 
             // Helper function to explicitly try the Android fallback if the primary API fails.
@@ -3837,9 +3845,11 @@
             // --- Mark as Seen on Window Focus ---
             window.addEventListener('focus', () => {
                 // If a user is logged in and the window gets focus, mark messages as seen.
-                if (activeUser && socket && socket.readyState === WebSocket.OPEN) {
+                if (activeUser) {
                     fetch('/api/messages/mark-as-seen', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: activeUser })
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user: activeUser }) // Send the current user to the backend
                     });
                 }
             });
@@ -4258,24 +4268,25 @@
             });
             // --- Unread Count Logic ---
             async function updateUnreadCounts() {
-                // Fetch for Raushan (messages sent by Nisha)
-                const alphaRes = await fetch('/api/messages/unread-count?user=alpha');
-                const alphaData = await alphaRes.json();
-                const alphaUnreadIndicator = document.getElementById('alpha-unread-indicator');
-                if (alphaData.count > 0) {
-                    alphaUnreadIndicator.classList.remove('hidden');
-                } else {
-                    alphaUnreadIndicator.classList.add('hidden');
-                }
+                try {
+                    // Fetch unread messages FOR Alpha (the blue dot)
+                    const alphaRes = await fetch('/api/messages/unread-count?user=alpha');
+                    const alphaData = await alphaRes.json();
+                    const alphaUnreadIndicator = document.getElementById('alpha-unread-indicator');
+                    alphaUnreadIndicator.classList.toggle('hidden', alphaData.count === 0);
 
-                // Fetch for Nisha (messages sent by Raushan)
-                const betaRes = await fetch('/api/messages/unread-count?user=beta');
-                const betaData = await betaRes.json();
-                const betaUnreadIndicator = document.getElementById('beta-unread-indicator');
-                if (betaData.count > 0) {
-                    betaUnreadIndicator.classList.remove('hidden');
-                } else {
-                    betaUnreadIndicator.classList.add('hidden');
+                    // Fetch unread messages FOR Beta (the green dot)
+                    const betaRes = await fetch('/api/messages/unread-count?user=beta');
+                    const betaData = await betaRes.json();
+                    const betaUnreadIndicator = document.getElementById('beta-unread-indicator');
+                    betaUnreadIndicator.classList.toggle('hidden', betaData.count === 0);
+                } catch (error) {
+                    console.error("Failed to update unread counts:", error);
+                    // Hide indicators on error to prevent them from being stuck on
+                    const alphaUnreadIndicator = document.getElementById('alpha-unread-indicator');
+                    const betaUnreadIndicator = document.getElementById('beta-unread-indicator');
+                    if (alphaUnreadIndicator) alphaUnreadIndicator.classList.add('hidden');
+                    if (betaUnreadIndicator) betaUnreadIndicator.classList.add('hidden');
                 }
             }
 
@@ -4301,6 +4312,7 @@
             setupWebSocket(); // Connect immediately to get live status updates
             updateUnreadCounts();
             unreadCountInterval = setInterval(updateUnreadCounts, 5000); // Poll every 5 seconds
+            // Unread count polling is removed
 
         });
     </script>
