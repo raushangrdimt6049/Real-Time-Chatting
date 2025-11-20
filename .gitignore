@@ -1,6 +1,8 @@
-# Ignore Node.js dependencies
-/node_modules
-# Ignore environment variables file
+# Ignore environment variables
 .env
-# Ignore sensitive credential files
-serviceAccountKey.json
+
+# Ignore node_modules directory
+/node_modules
+
+# Ignore system files
+.DS_Store
