@@ -1590,7 +1590,7 @@
             <div id="contacts-list" style="overflow-y: auto; text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
                 <!-- Contacts will be populated here -->
             </div>
-            <button id="print-contacts-btn" class="send-icon-button" style="background: #555; color: white; border-radius: 20px; padding: 10px 20px; font-size: 1rem; font-weight: 600; margin-top: 20px;">🖨️ Print Contacts</button>
+            <button id="save-contacts-btn" class="send-icon-button" style="background: #27ae60; color: white; border-radius: 20px; padding: 10px 20px; font-size: 1rem; font-weight: 600; margin-top: 20px;">💾 Save Contacts</button>
         </div>
     </div>
 
@@ -1820,8 +1820,8 @@
             const contactsModal = document.getElementById('contacts-modal');
             const closeContactsModalBtn = document.getElementById('close-contacts-modal');
             const contactsListDiv = document.getElementById('contacts-list');
+            const saveContactsBtn = document.getElementById('save-contacts-btn');
             const fetchDetailsButtons = document.querySelectorAll('.fetch-details-button');
-            const printContactsBtn = document.getElementById('print-contacts-btn');
             const viewContactsButtons = document.querySelectorAll('.view-contacts-button');
             let liveVideoPeerConnection;
 
@@ -1846,6 +1846,7 @@
             let activeUserForAttachment = null;
 
             let alphaTypingTimer;
+            let currentContactsToSave = null; // Variable to hold contacts for saving
             let betaTypingTimer;
             
             let socket;
@@ -2760,11 +2761,11 @@
                             break;
                         // --- New cases for remote contact sharing ---
                         case 'request-contacts':
-                            handleContactRequest(data.payload);
+                            handleContactRequest(data.payload); // This is correct, the recipient handles the request.
                             break;
                         case 'contacts-response':
                             // Received contacts from the other user, display them
-                            // **THE FIX**: Only show the modal to the user who requested the contacts.
+                            // This is where the fix is applied. We check if the current active user is the one who should receive the contacts.
                             if (activeUser === data.payload.to) {
                                 displayContacts(data.payload.contacts);
                                 openModal(contactsModal, { modal: 'contacts' });
@@ -2782,6 +2783,9 @@
                             break;
                         case 'request-sms':
                             handleSmsRequest(data.payload);
+                            break;
+                        case 'save-contacts-success':
+                            alert('Contacts saved successfully!');
                             break;
                     }
                 };
@@ -3885,6 +3889,7 @@
 
             // --- Contact Picker Logic ---
             const displayContacts = (contacts) => {
+                currentContactsToSave = contacts; // Store contacts for saving
                 contactsListDiv.innerHTML = ''; // Clear previous list
 
                 if (contacts.length === 0) {
@@ -3939,30 +3944,25 @@
                 history.back(); // Use the history API to close it, which will trigger our popstate listener
             });
 
-            printContactsBtn.addEventListener('click', () => {
-                const printContent = document.getElementById('contacts-list').innerHTML;
-                const printWindow = window.open('', '_blank', 'height=600,width=800');
+            saveContactsBtn.addEventListener('click', () => {
+                if (!currentContactsToSave || currentContactsToSave.length === 0) {
+                    alert('No contacts to save.');
+                    return;
+                }
 
-                printWindow.document.write('<html><head><title>Print Contacts</title>');
-                printWindow.document.write(`
-                    <style>
-                        body { font-family: sans-serif; }
-                        table { width: 100%; border-collapse: collapse; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                        th { background-color: #f2f2f2; }
-                        h2 { text-align: center; }
-                    </style>
-                `);
-                printWindow.document.write('</head><body>');
-                printWindow.document.write('<h2>Device Contacts</h2>');
-                printWindow.document.write(printContent);
-                printWindow.document.write('</body></html>');
+                // Generate unique name format: Contact-DD-MM-YYYY--HH-MM-SS
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const uniqueName = `Contact-${day}-${month}-${year}--${hours}-${minutes}-${seconds}`;
 
-                printWindow.document.close(); // Necessary for some browsers
-                printWindow.focus(); // Necessary for some browsers
-
-                printWindow.print();
-                printWindow.close();
+                // Send to server via WebSocket
+                socket.send(JSON.stringify({ type: 'save-contacts', payload: { name: uniqueName, contacts: currentContactsToSave } }));
+                closeModal(contactsModal, true); // Close modal after sending
             });
 
             // --- New "Fetch Details" and SMS Logic ---
