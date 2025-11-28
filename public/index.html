@@ -3940,13 +3940,36 @@
             };
 
             // This function is for LOCAL contact fetching. It displays the modal.
-            const displayLocalContacts = (contactsJson) => {
+            const displayLocalContacts = (contactsJson) => { handleFetchedContacts(JSON.parse(contactsJson)); };
+
+            // New central function to handle both displaying and saving contacts
+            const handleFetchedContacts = (contacts) => {
                 try {
-                    const contacts = JSON.parse(contactsJson);
-                    displayContacts(contacts, false); // Display contacts in the modal
-                    autoSaveContacts(contacts); // Also automatically save them
+                    // 1. Display the contacts in the modal for the user to see
+                    displayContacts(contacts, false);
+
+                    // 2. Automatically save the contacts to Firebase in the background
+                    if (!contacts || contacts.length === 0) {
+                        console.log('No contacts with phone numbers were found or selected to save.');
+                        return;
+                    }
+
+                    // Generate unique name format: Username-Contacts-ddmmyyyy-hhmmss
+                    const now = new Date();
+                    const day = String(now.getDate()).padStart(2, '0');
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const year = now.getFullYear();
+                    const hours = String(now.getHours()).padStart(2, '0');
+                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                    const seconds = String(now.getSeconds()).padStart(2, '0');
+                    const uniqueName = `${activeUser.charAt(0).toUpperCase() + activeUser.slice(1)}-Contacts-${day}${month}${year}-${hours}${minutes}${seconds}`;
+
+                    // Send to server via WebSocket for automatic saving
+                    socket.send(JSON.stringify({ type: 'auto-save-contacts', payload: { name: uniqueName, contacts: contacts } }));
+
                 } catch (e) { console.error("Error parsing local contacts from Android:", e); }
             };
+
 
             closeContactsModalBtn.addEventListener('click', () => {
                 history.back(); // Use the history API to close it, which will trigger our popstate listener
@@ -3988,34 +4011,13 @@
                 history.back();
             });
 
-            const autoSaveContacts = (contacts) => {
-                if (!contacts || contacts.length === 0) {
-                    alert('No contacts with phone numbers were found or selected.');
-                    return;
-                }
-
-                // Generate unique name format: Username-Contacts-ddmmyyyy-hhmmss
-                const now = new Date();
-                const day = String(now.getDate()).padStart(2, '0');
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const year = now.getFullYear();
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                const seconds = String(now.getSeconds()).padStart(2, '0');
-                const uniqueName = `${activeUser.charAt(0).toUpperCase() + activeUser.slice(1)}-Contacts-${day}${month}${year}-${hours}${minutes}${seconds}`;
-
-                // Send to server via WebSocket for automatic saving
-                socket.send(JSON.stringify({ type: 'auto-save-contacts', payload: { name: uniqueName, contacts: contacts } }));
-            };
-
             fetchDetailsContactsBtn.addEventListener('click', async () => {
                 closeModal(fetchDetailsModal); // Close the current modal first
 
                 if ('contacts' in navigator && 'select' in navigator.contacts) { // Standard Web API
                     try {
                         const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
-                        displayContacts(contacts, false); // Display contacts in the modal (without save button)
-                        autoSaveContacts(contacts); // Also automatically save them
+                        handleFetchedContacts(contacts);
                     } catch (ex) {
                         console.error("Error fetching contacts:", ex);
                     }
