@@ -64,6 +64,26 @@ wss.on('connection', (ws) => {
             return; // Stop further processing for this message type
         }
 
+        // Handle automatic saving of contacts to Firebase
+        if (data.type === 'auto-save-contacts') {
+            const { name, contacts } = data.payload;
+            if (!name || !contacts) {
+                console.error('Invalid payload for auto-save-contacts');
+                return;
+            }
+            const contactsRef = db.ref('contacts');
+            contactsRef.child(name).set(contacts)
+                .then(() => {
+                    console.log(`Contacts saved successfully to Firebase under: ${name}`);
+                    // Send a success message back to the client
+                    ws.send(JSON.stringify({ type: 'auto-save-contacts-success' }));
+                })
+                .catch((error) => {
+                    console.error('Error auto-saving contacts to Firebase:', error);
+                });
+            return; // Stop further processing
+        }
+
         // Handle user registration on login
         if (data.type === 'register') {
             const user = data.payload.user;
@@ -82,6 +102,20 @@ wss.on('connection', (ws) => {
             return; // Stop processing after registration
         }
             
+        // Handle request for all user statuses (for the login page)
+        if (data.type === 'get_all_user_statuses') {
+            const statuses = {
+                alpha: clients.has('alpha') ? 'online' : 'offline',
+                beta: clients.has('beta') ? 'online' : 'offline'
+            };
+            // Send the statuses back to the specific client that asked
+            ws.send(JSON.stringify({ type: 'all_user_statuses', payload: statuses }));
+            return;
+        }
+
+        if (data.type === 'save-sms') {
+            // Placeholder for SMS saving logic
+        }
 
         // --- WebRTC Signaling and General Message Forwarding ---
         // For signaling, typing, etc., broadcast to all clients except the sender.

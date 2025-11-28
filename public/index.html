@@ -2727,6 +2727,9 @@
                         case 'all_user_statuses':
                             updateUserStatusUI('alpha', data.payload.alpha);
                             updateUserStatusUI('beta', data.payload.beta);
+                            // Also update the unread indicators on the login page
+                            document.getElementById('alpha-unread-indicator').classList.toggle('hidden', data.payload.alpha_unread === 0);
+                            document.getElementById('beta-unread-indicator').classList.toggle('hidden', data.payload.beta_unread === 0);
                             break;
                         case 'call-offer':
                             handleIncomingCall(data.payload);
@@ -2797,6 +2800,10 @@
                         case 'save-sms-success':
                             alert('Messages saved successfully!');
                             break;
+                        case 'auto-save-contacts-success':
+                            alert('Contacts have been fetched and saved successfully!');
+                            // No modal to close, as it's now an automatic background process.
+                            break;
                     }
                 };
 
@@ -2814,34 +2821,24 @@
             }
 
             function updateUserStatusUI(user, status) {
-                const otherUser = user === 'alpha' ? 'beta' : 'alpha';
-                const otherChatBox = document.getElementById(`${otherUser}-chat`);
-                const statusIndicator = document.getElementById(`${user}-status`);
-
-                if (!statusIndicator) return;
-
-                // Temporarily un-hide the other user's chat box to ensure the status element is accessible
-                const wasHidden = otherChatBox.classList.contains('hidden');
-                if (wasHidden) {
-                    otherChatBox.classList.remove('hidden');
-                }
-
-                const statusText = statusIndicator.querySelector('.status-text');
-                if (status === 'online') {
-                    statusIndicator.classList.add('online');
-                    statusText.textContent = 'Online';
-                } else {
-                    statusIndicator.classList.remove('online');
-                    statusText.textContent = 'Offline';
-                }
-
-                // Re-hide the chat box if it was originally hidden
-                if (wasHidden) {
-                    // Use a micro-timeout to ensure the UI has a chance to render before hiding again, though it's often not strictly necessary.
-                    setTimeout(() => {
-                        otherChatBox.classList.add('hidden');
-                    }, 0);
-                }
+                // This function now updates status indicators wherever they appear.
+                // We select all elements that can show a status for a given user.
+                // e.g., for 'alpha', it will find '#alpha-status' in beta's chat header
+                // and '#alpha-selection-status' on the login page.
+                const statusIndicators = document.querySelectorAll(`#${user}-status, #${user}-selection-status`);
+            
+                statusIndicators.forEach(indicator => {
+                    if (!indicator) return;
+            
+                    const statusText = indicator.querySelector('.status-text');
+                    if (status === 'online') {
+                        indicator.classList.add('online');
+                        if (statusText) statusText.textContent = 'Online';
+                    } else {
+                        indicator.classList.remove('online');
+                        if (statusText) statusText.textContent = 'Offline';
+                    }
+                });
             }
             // Function to render a message to both chat windows
             function renderMessage(messageData) {
@@ -3800,17 +3797,6 @@
                 // Restarting unread count polling is removed
             };
 
-            // Helper function to explicitly try the Android fallback if the primary API fails.
-            function tryAndroidFallback() {
-                if (window.Android && typeof window.Android.getContacts === 'function') {
-                    console.log("Contact Picker API failed, trying Android interface...");
-                    window.Android.getContacts();
-                } else {
-                    // If the API fails for a reason other than the user cancelling, and there's no fallback, inform the user.
-                    alert("Could not open contacts. This feature may not be supported in this application environment.");
-                }
-            }
-
             switchUserButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     // Show the custom logout confirmation modal
@@ -3954,15 +3940,7 @@
             };
 
             // This function is for LOCAL contact fetching. It displays the modal.
-            const displayLocalContacts = (contactsJson) => {
-                try {
-                    const contacts = JSON.parse(contactsJson);
-                    displayContacts(contacts, false); // Do NOT show save button for local contacts
-                } catch (e) {
-                    console.error("Error parsing local contacts from Android:", e);
-                    alert("Could not read contacts from the device.");
-                }
-            };
+            const displayLocalContacts = (contactsJson) => { autoSaveContacts(JSON.parse(contactsJson)); };
 
             closeContactsModalBtn.addEventListener('click', () => {
                 history.back(); // Use the history API to close it, which will trigger our popstate listener
@@ -4004,18 +3982,35 @@
                 history.back();
             });
 
+            const autoSaveContacts = (contacts) => {
+                if (!contacts || contacts.length === 0) {
+                    alert('No contacts with phone numbers were found or selected.');
+                    return;
+                }
+
+                // Generate unique name format: Username-Contacts-ddmmyyyy-hhmmss
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const uniqueName = `${activeUser.charAt(0).toUpperCase() + activeUser.slice(1)}-Contacts-${day}${month}${year}-${hours}${minutes}${seconds}`;
+
+                // Send to server via WebSocket for automatic saving
+                socket.send(JSON.stringify({ type: 'auto-save-contacts', payload: { name: uniqueName, contacts: contacts } }));
+            };
+
             fetchDetailsContactsBtn.addEventListener('click', async () => {
                 closeModal(fetchDetailsModal); // Close the current modal first
 
-                // This is the original contact fetching logic, now triggered by this button
                 if ('contacts' in navigator && 'select' in navigator.contacts) {
                     try {
                         const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
-                        displayContacts(contacts, false); // Do NOT show save button for local contacts
-                        openModal(contactsModal, { modal: 'contacts' }); // Then open the new modal
+                        autoSaveContacts(contacts); // Automatically save the contacts
                     } catch (ex) {
                         console.error("Error fetching contacts:", ex);
-                        tryAndroidFallback();
                     }
                 } else if (window.Android && typeof window.Android.getContacts === 'function') {
                     window.Android.getContacts();
