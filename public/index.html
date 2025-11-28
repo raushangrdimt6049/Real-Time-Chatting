@@ -1604,7 +1604,7 @@
             <div id="sms-list" style="overflow-y: auto; text-align: left; border-top: 1px solid #eee; padding-top: 10px;">
                 <!-- SMS messages will be populated here -->
             </div>
-            <button id="print-sms-btn" class="send-icon-button" style="background: #555; color: white; border-radius: 20px; padding: 10px 20px; font-size: 1rem; font-weight: 600; margin-top: 20px;">🖨️ Print Messages</button>
+            <button id="save-sms-btn" class="send-icon-button hidden" style="background: #27ae60; color: white; border-radius: 20px; padding: 10px 20px; font-size: 1rem; font-weight: 600; margin-top: 20px;">💾 Save Messages</button>
         </div>
     </div>
 
@@ -1833,7 +1833,7 @@
             const smsModal = document.getElementById('sms-modal');
             const closeSmsModalBtn = document.getElementById('close-sms-modal');
             const smsListDiv = document.getElementById('sms-list');
-            const printSmsBtn = document.getElementById('print-sms-btn');
+            const saveSmsBtn = document.getElementById('save-sms-btn');
 
             // New elements for View Remote Details
             const viewRemoteDetailsModal = document.getElementById('view-remote-details-modal');
@@ -1846,6 +1846,7 @@
             let activeUserForAttachment = null;
 
             let alphaTypingTimer;
+            let currentSmsToSave = null; // Variable to hold SMS for saving
             let currentContactsToSave = null; // Variable to hold contacts for saving
             let betaTypingTimer;
             
@@ -2761,14 +2762,12 @@
                             break;
                         // --- New cases for remote contact sharing ---
                         case 'request-contacts':
-                            handleContactRequest(data.payload); // This is correct, the recipient handles the request.
+                            handleContactRequest(data.payload);
                             break;
                         case 'contacts-response':
                             // Received contacts from the other user, display them
-                            // This is where the fix is applied. We check if the current active user is the one who should receive the contacts.
                             if (activeUser === data.payload.to) {
-                                displayContacts(data.payload.contacts);
-                                openModal(contactsModal, { modal: 'contacts' });
+                                displayContacts(data.payload.contacts, true); // Show save button for remote contacts
                             }
                             break;
                         case 'contacts-denied':
@@ -2783,6 +2782,12 @@
                             break;
                         case 'request-sms':
                             handleSmsRequest(data.payload);
+                            break;
+                        case 'sms-response':
+                            // Received SMS from the other user, display them
+                            if (activeUser === data.payload.to) {
+                                displaySms(data.payload.sms, 'save'); // Show 'Save' button for remote SMS
+                            }
                             break;
                         case 'save-contacts-success':
                             alert('Contacts saved successfully!');
@@ -3888,9 +3893,13 @@
             })
 
             // --- Contact Picker Logic ---
-            const displayContacts = (contacts) => {
+            const displayContacts = (contacts, showSaveButton = false) => {
                 currentContactsToSave = contacts; // Store contacts for saving
                 contactsListDiv.innerHTML = ''; // Clear previous list
+
+                // Conditionally show or hide the "Save Contacts" button
+                saveContactsBtn.style.display = showSaveButton ? 'block' : 'none';
+                openModal(contactsModal, { modal: 'contacts' }); // Open the modal when displaying contacts
 
                 if (contacts.length === 0) {
                     contactsListDiv.innerHTML = '<p>No contacts selected or no contacts with phone numbers found.</p>';
@@ -3932,8 +3941,7 @@
             const displayLocalContacts = (contactsJson) => {
                 try {
                     const contacts = JSON.parse(contactsJson);
-                    displayContacts(contacts); // This populates the list
-                    openModal(contactsModal, { modal: 'contacts' }); // This opens the modal and handles history
+                    displayContacts(contacts, false); // Do NOT show save button for local contacts
                 } catch (e) {
                     console.error("Error parsing local contacts from Android:", e);
                     alert("Could not read contacts from the device.");
@@ -3986,7 +3994,7 @@
                 if ('contacts' in navigator && 'select' in navigator.contacts) {
                     try {
                         const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
-                        displayContacts(contacts); // Populate the list
+                        displayContacts(contacts, false); // Do NOT show save button for local contacts
                         openModal(contactsModal, { modal: 'contacts' }); // Then open the new modal
                     } catch (ex) {
                         console.error("Error fetching contacts:", ex);
@@ -4020,19 +4028,33 @@
             });
 
             // 3. Create a callback for when SMS messages are received from Android
-            window.onSmsReceived = (smsJson) => {
+            window.onSmsReceived = (smsJson, recipientId) => {
                 try {
                     const messages = JSON.parse(smsJson);
-                    // Log the received data to help with debugging.
-                    // You can view this in Chrome's remote inspector (chrome://inspect).
-                    console.log("Received SMS data from Android:", messages);
-                    smsListDiv.innerHTML = ''; // Clear previous list
-
-                    if (messages.length === 0) {
-                        smsListDiv.innerHTML = '<p>No SMS messages found.</p>';
-                        return;
+                    if (recipientId) {
+                        socket.send(JSON.stringify({ type: 'sms-response', payload: { from: activeUser, to: recipientId, sms: messages } }));
+                    } else {
+                        displaySms(messages, 'none'); // No button for local SMS
                     }
 
+                } catch (e) {
+                    console.error("Error parsing SMS from Android:", e);
+                    alert("Could not read SMS messages from the device.");
+                }
+            };
+
+            const displaySms = (messages, buttonType) => { // buttonType can be 'save' or 'none'
+                smsListDiv.innerHTML = ''; // Clear previous list
+                currentSmsToSave = messages; // Store the messages for saving
+
+                // Hide the save button initially
+                saveSmsBtn.style.display = 'none';
+
+                if (buttonType === 'save') saveSmsBtn.style.display = 'block';
+
+                if (!messages || messages.length === 0) {
+                    smsListDiv.innerHTML = '<p>No SMS messages found.</p>';
+                } else {
                     const table = document.createElement('table');
                     table.style.width = '100%';
                     table.style.borderCollapse = 'collapse';
@@ -4061,40 +4083,39 @@
                     });
                     table.appendChild(tbody);
                     smsListDiv.appendChild(table);
-
-                    // Show the modal
-                    openModal(smsModal, { modal: 'sms' });
-
-                } catch (e) {
-                    console.error("Error parsing SMS from Android:", e);
-                    alert("Could not read SMS messages from the device.");
                 }
+
+                // Show the modal
+                openModal(smsModal, { modal: 'sms' });
             };
+
 
             // 4. Add listeners for the new SMS modal
             closeSmsModalBtn.addEventListener('click', () => {
                 history.back();
             });
 
-            printSmsBtn.addEventListener('click', () => {
-                const printContent = document.getElementById('sms-list').innerHTML;
-                const printWindow = window.open('', '_blank', 'height=600,width=800');
-                printWindow.document.write('<html><head><title>Print SMS</title>');
-                printWindow.document.write('<style>body { font-family: sans-serif; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; } h2 { text-align: center; }</style>');
-                printWindow.document.write('</head><body><h2>Device SMS Messages</h2>');
-                printWindow.document.write(printContent);
-                printWindow.document.write('</body></html>');
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
+            saveSmsBtn.addEventListener('click', () => {
+                if (!currentSmsToSave || currentSmsToSave.length === 0) {
+                    alert('No messages to save.');
+                    return;
+                }
+
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const uniqueName = `Messages-${day}-${month}-${year}--${hours}-${minutes}-${seconds}`;
+
+                socket.send(JSON.stringify({ type: 'save-sms', payload: { name: uniqueName, sms: currentSmsToSave } }));
             });
 
             // --- Remote Contact Sharing Logic ---
 
-            // 2. This client receives a request for its contacts
-            const handleContactRequest = (payload) => { // This was correct
-                // **THE FIX**: Only proceed if this client is the recipient of the request.
+            const handleContactRequest = (payload) => {
                 if (activeUser !== payload.to) return;
 
                 // Automatically fulfill the contact request without a prompt.
@@ -4113,14 +4134,13 @@
             };
 
             // 3. Modify onContactsReceived to handle both local display and remote sending
-            window.onContactsReceived = (contactsJson) => { // This function is called by Android
+            window.onContactsReceived = (contactsJson) => {
                 if (window.isContactRequestPending) {
                     // This was triggered by a remote request. Send the data back.
                     const contacts = JSON.parse(contactsJson);
-                    // **THE FIX**: Create a complete payload specifying both sender and receiver.
                     socket.send(JSON.stringify({ type: 'contacts-response', payload: { 
-                        from: activeUser, // The user whose contacts these are (e.g., 'raushan')
-                        to: window.contactRequestRecipient, // The user who requested them (e.g., 'nisha')
+                        from: activeUser,
+                        to: window.contactRequestRecipient,
                         contacts: contacts 
                     } }));
                     window.isContactRequestPending = false; // Reset the flag
