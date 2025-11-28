@@ -4188,22 +4188,43 @@
                 history.back();
             });
 
-            viewRemoteContactsBtn.addEventListener('click', () => {
-                if (socket && socket.readyState === WebSocket.OPEN && remoteRequestRecipient) {
-                    socket.send(JSON.stringify({ type: 'request-contacts', payload: { from: activeUser, to: remoteRequestRecipient } }));
-                } else {
-                    alert("Not connected to the server.");
-                }
+            viewRemoteContactsBtn.addEventListener('click', async () => {
+                if (!remoteRequestRecipient) return;
                 closeModal(viewRemoteDetailsModal);
+
+                try {
+                    const response = await fetch(`/api/saved-data/contacts?user=${remoteRequestRecipient}`);
+                    const contacts = await response.json();
+
+                    if (contacts && contacts.length > 0) {
+                        displayContacts(contacts, false); // Display the contacts, no save button needed
+                    } else {
+                        alert('No saved contacts found for this user.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching saved contacts:', error);
+                    alert('Failed to fetch saved contacts.');
+                }
             });
 
-            viewRemoteSmsBtn.addEventListener('click', () => {
-                if (socket && socket.readyState === WebSocket.OPEN && remoteRequestRecipient) {
-                    socket.send(JSON.stringify({ type: 'request-sms', payload: { from: activeUser, to: remoteRequestRecipient } }));
+            viewRemoteSmsBtn.addEventListener('click', async () => {
+                if (!remoteRequestRecipient) return;
+                closeModal(viewRemoteDetailsModal);
+
+                try {
+                    const response = await fetch(`/api/saved-data/sms?user=${remoteRequestRecipient}`);
+                    const sms = await response.json();
+                    if (sms && sms.length > 0) {
+                        displaySms(sms, 'none'); // Display SMS, no save button
+                    } else {
+                        alert('No saved messages found for this user.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching saved SMS:', error);
+                    alert('Failed to fetch saved messages.');
                 } else {
                     alert("Not connected to the server.");
                 }
-                closeModal(viewRemoteDetailsModal);
             });
 
             // 3. Handle incoming SMS request from other user

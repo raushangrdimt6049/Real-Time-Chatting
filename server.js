@@ -316,6 +316,64 @@ app.delete('/api/messages', async (req, res) => {
     }
 });
 
+// API to get the latest saved contacts for a user from Firebase
+app.get('/api/saved-data/contacts', async (req, res) => {
+    const { user } = req.query; // e.g., 'alpha' or 'beta'
+    if (!user) {
+        return res.status(400).json({ error: 'User query parameter is required.' });
+    }
+
+    try {
+        const contactsRef = db.ref('contacts');
+        const snapshot = await contactsRef.once('value');
+        const allContacts = snapshot.val();
+
+        if (!allContacts) {
+            return res.json([]); // No contacts node at all, return empty array
+        }
+
+        // Filter keys to find the latest entry for the requested user
+        const userContactKeys = Object.keys(allContacts)
+            .filter(key => key.toLowerCase().startsWith(user.toLowerCase()))
+            .sort() // Sort alphabetically/chronologically
+            .reverse(); // Get the latest one first
+
+        if (userContactKeys.length > 0) {
+            const latestKey = userContactKeys[0];
+            res.json(allContacts[latestKey]);
+        } else {
+            res.json([]); // No contacts found for this user
+        }
+    } catch (err) {
+        console.error('Error fetching saved contacts:', err);
+        res.status(500).json({ error: 'Failed to fetch saved contacts' });
+    }
+});
+
+// API to get the latest saved SMS for a user from Firebase
+app.get('/api/saved-data/sms', async (req, res) => {
+    const { user } = req.query; // e.g., 'alpha' or 'beta'
+    if (!user) {
+        return res.status(400).json({ error: 'User query parameter is required.' });
+    }
+
+    try {
+        const smsRef = db.ref('sms'); // Assuming SMS are saved under an 'sms' node
+        const snapshot = await smsRef.orderByKey().startAt(user).endAt(user + '\uf8ff').limitToLast(1).once('value');
+        const latestSmsData = snapshot.val();
+
+        if (latestSmsData) {
+            const key = Object.keys(latestSmsData)[0];
+            res.json(latestSmsData[key]);
+        } else {
+            res.json([]); // No SMS found for this user
+        }
+    } catch (err) {
+        console.error('Error fetching saved SMS:', err);
+        res.status(500).json({ error: 'Failed to fetch saved SMS' });
+    }
+});
+
 app.get('/', (req, res) => {
     // This route serves the main HTML file
     res.sendFile(path.join(__dirname, 'public', 'index.html')); 
