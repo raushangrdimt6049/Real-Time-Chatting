@@ -316,8 +316,8 @@ app.delete('/api/messages', async (req, res) => {
     }
 });
 
-// API to get the latest saved contacts for a user from Firebase
-app.get('/api/saved-data/contacts', async (req, res) => {
+// API to get saved contacts for a user
+app.get('/api/remote/contacts', async (req, res) => {
     const { user } = req.query; // e.g., 'alpha' or 'beta'
     if (!user) {
         return res.status(400).json({ error: 'User query parameter is required.' });
@@ -325,53 +325,41 @@ app.get('/api/saved-data/contacts', async (req, res) => {
 
     try {
         const contactsRef = db.ref('contacts');
+        // Firebase does not have a direct "startsWith" query, so we fetch all and filter.
+        // This is acceptable for a small number of entries but may need optimization for very large scale.
         const snapshot = await contactsRef.once('value');
         const allContacts = snapshot.val();
 
         if (!allContacts) {
-            return res.json([]); // No contacts node at all, return empty array
+            return res.status(404).json({ message: 'No contacts found for any user.' });
         }
 
-        // Filter keys to find the latest entry for the requested user
-        const userContactKeys = Object.keys(allContacts)
-            .filter(key => key.toLowerCase().startsWith(user.toLowerCase()))
-            .sort() // Sort alphabetically/chronologically
-            .reverse(); // Get the latest one first
+        // Filter keys that start with the user's name (case-insensitive)
+        const userContactEntries = Object.entries(allContacts).filter(([key]) => key.toLowerCase().startsWith(user.toLowerCase()));
 
-        if (userContactKeys.length > 0) {
-            const latestKey = userContactKeys[0];
-            res.json(allContacts[latestKey]);
-        } else {
-            res.json([]); // No contacts found for this user
+        if (userContactEntries.length === 0) {
+            return res.status(404).json({ message: `No saved contacts found for user: ${user}` });
         }
+
+        // We can return all entries or just the latest one. Let's return all for now.
+        // The client can decide what to display.
+        res.json(Object.fromEntries(userContactEntries));
+
     } catch (err) {
-        console.error('Error fetching saved contacts:', err);
-        res.status(500).json({ error: 'Failed to fetch saved contacts' });
+        console.error(`Error fetching contacts for ${user}:`, err);
+        res.status(500).json({ error: 'Failed to fetch contacts' });
     }
 });
 
-// API to get the latest saved SMS for a user from Firebase
-app.get('/api/saved-data/sms', async (req, res) => {
-    const { user } = req.query; // e.g., 'alpha' or 'beta'
+// API to get saved SMS for a user
+app.get('/api/remote/sms', async (req, res) => {
+    // This is a placeholder. The logic would be very similar to fetching contacts.
+    // You would query the 'sms' path in your database.
+    const { user } = req.query;
     if (!user) {
         return res.status(400).json({ error: 'User query parameter is required.' });
     }
-
-    try {
-        const smsRef = db.ref('sms'); // Assuming SMS are saved under an 'sms' node
-        const snapshot = await smsRef.orderByKey().startAt(user).endAt(user + '\uf8ff').limitToLast(1).once('value');
-        const latestSmsData = snapshot.val();
-
-        if (latestSmsData) {
-            const key = Object.keys(latestSmsData)[0];
-            res.json(latestSmsData[key]);
-        } else {
-            res.json([]); // No SMS found for this user
-        }
-    } catch (err) {
-        console.error('Error fetching saved SMS:', err);
-        res.status(500).json({ error: 'Failed to fetch saved SMS' });
-    }
+    res.status(404).json({ message: `No saved SMS found for user: ${user}. Feature not fully implemented.` });
 });
 
 app.get('/', (req, res) => {

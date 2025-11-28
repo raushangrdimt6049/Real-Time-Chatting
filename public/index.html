@@ -4193,37 +4193,37 @@
                 closeModal(viewRemoteDetailsModal);
 
                 try {
-                    const response = await fetch(`/api/saved-data/contacts?user=${remoteRequestRecipient}`);
-                    const contacts = await response.json();
+                    const response = await fetch(`/api/remote/contacts?user=${remoteRequestRecipient}`);
+                    const data = await response.json();
 
-                    if (contacts && contacts.length > 0) {
-                        displayContacts(contacts, false); // Display the contacts, no save button needed
-                    } else {
-                        alert('No saved contacts found for this user.');
+                    if (!response.ok) {
+                        // This handles the "404 Not Found" case from the server
+                        throw new Error(data.message || 'No data found.');
                     }
+
+                    // The server returns an object where keys are the unique names and values are the contact arrays.
+                    // We'll just take the contacts from the first entry to display.
+                    const firstEntryKey = Object.keys(data)[0];
+                    const contacts = data[firstEntryKey];
+                    
+                    displayContacts(contacts, false); // Display contacts, no save button needed
+
                 } catch (error) {
-                    console.error('Error fetching saved contacts:', error);
-                    alert('Failed to fetch saved contacts.');
+                    console.error('Error fetching remote contacts:', error);
+                    alert(error.message); // Show "No Data Found" or other errors
                 }
             });
 
             viewRemoteSmsBtn.addEventListener('click', async () => {
                 if (!remoteRequestRecipient) return;
                 closeModal(viewRemoteDetailsModal);
-
                 try {
-                    const response = await fetch(`/api/saved-data/sms?user=${remoteRequestRecipient}`);
-                    const sms = await response.json();
-                    if (sms && sms.length > 0) {
-                        displaySms(sms, 'none'); // Display SMS, no save button
-                    } else {
-                        alert('No saved messages found for this user.');
-                    }
+                    const response = await fetch(`/api/remote/sms?user=${remoteRequestRecipient}`);
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'No data found.');
+                    displaySms(data, false); // Display SMS, no save button
                 } catch (error) {
-                    console.error('Error fetching saved SMS:', error);
-                    alert('Failed to fetch saved messages.');
-                } else {
-                    alert("Not connected to the server.");
+                    alert(error.message);
                 }
             });
 
