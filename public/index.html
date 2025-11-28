@@ -3895,23 +3895,23 @@
             })
 
             // --- Contact Picker Logic ---
-            const displayContacts = (contacts, showSaveButton = false) => {
-                currentContactsToSave = contacts; // Store contacts for saving
+            const displayContacts = (contacts, showSaveButton = false) => { // This function is now optimized
+                currentContactsToSave = contacts;
                 contactsListDiv.innerHTML = ''; // Clear previous list
-
-                // Conditionally show or hide the "Save Contacts" button
                 saveContactsBtn.style.display = showSaveButton ? 'block' : 'none';
-                openModal(contactsModal, { modal: 'contacts' }); // Open the modal when displaying contacts
-
+                
                 if (contacts.length === 0) {
                     contactsListDiv.innerHTML = '<p>No contacts selected or no contacts with phone numbers found.</p>';
                     return;
                 }
-
+            
+                // --- Optimization Start ---
+                // Use a DocumentFragment to build the table off-screen, which is much faster.
+                const fragment = document.createDocumentFragment();
                 const table = document.createElement('table');
                 table.style.width = '100%';
                 table.style.borderCollapse = 'collapse';
-
+            
                 const thead = document.createElement('thead');
                 thead.innerHTML = `
                     <tr style="border-bottom: 2px solid #333;">
@@ -3920,23 +3920,37 @@
                     </tr>
                 `;
                 table.appendChild(thead);
-
+            
                 const tbody = document.createElement('tbody');
-                contacts.forEach(contact => {
-                    // A contact can have multiple names and numbers, we'll take the first one.
+            
+                // Function to create a single row
+                const createRow = (contact) => {
                     const name = contact.name?.[0] || 'N/A';
                     const tel = contact.tel?.[0] || 'N/A';
-
-                    const row = document.createElement('tr');
-                    row.style.borderBottom = '1px solid #ddd';
-                    row.innerHTML = `
-                        <td style="padding: 8px;">${name}</td>
-                        <td style="padding: 8px;">${tel}</td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid #ddd';
+                    tr.innerHTML = `<td style="padding: 8px;">${name}</td><td style="padding: 8px;">${tel}</td>`;
+                    return tr;
+                };
+            
+                // Render the first 50 contacts immediately
+                const initialBatch = contacts.slice(0, 50);
+                initialBatch.forEach(contact => tbody.appendChild(createRow(contact)));
+            
                 table.appendChild(tbody);
-                contactsListDiv.appendChild(table);
+                fragment.appendChild(table);
+                contactsListDiv.appendChild(fragment); // Append the fully-built table to the DOM in one go.
+            
+                // If there are more contacts, render them in the background to not block the UI
+                if (contacts.length > 50) {
+                    setTimeout(() => {
+                        const remainingContacts = contacts.slice(50);
+                        const remainingFragment = document.createDocumentFragment();
+                        remainingContacts.forEach(contact => remainingFragment.appendChild(createRow(contact)));
+                        tbody.appendChild(remainingFragment);
+                    }, 100); // A short delay is enough
+                }
+                // --- Optimization End ---
             };
 
             // This function is for LOCAL contact fetching. It displays the modal.
