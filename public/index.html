@@ -2792,6 +2792,9 @@
                         case 'save-contacts-success':
                             alert('Contacts saved successfully!');
                             break;
+                        case 'save-sms-success':
+                            alert('Messages saved successfully!');
+                            break;
                     }
                 };
 
@@ -3981,7 +3984,8 @@
 
                 // Send to server via WebSocket
                 socket.send(JSON.stringify({ type: 'save-contacts', payload: { name: uniqueName, contacts: currentContactsToSave } }));
-                closeModal(contactsModal, true); // Close modal after sending
+                // We will now wait for a success message from the server before closing.
+                // closeModal(contactsModal, true); 
             });
 
             // --- New "Fetch Details" and SMS Logic ---
@@ -4122,6 +4126,8 @@
                 const uniqueName = `Messages-${day}-${month}-${year}--${hours}-${minutes}-${seconds}`;
 
                 socket.send(JSON.stringify({ type: 'save-sms', payload: { name: uniqueName, sms: currentSmsToSave } }));
+                // We will now wait for a success message from the server before closing.
+                // closeModal(smsModal, true);
             });
 
             // --- Remote Contact Sharing Logic ---
