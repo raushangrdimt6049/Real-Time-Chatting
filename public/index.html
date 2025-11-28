@@ -3895,18 +3895,20 @@
             })
 
             // --- Contact Picker Logic ---
-            const displayContacts = (contacts, showSaveButton = false) => { // This function is now optimized
+            const displayContacts = (contacts, showSaveButton = false) => {
                 currentContactsToSave = contacts;
                 contactsListDiv.innerHTML = ''; // Clear previous list
                 saveContactsBtn.style.display = showSaveButton ? 'block' : 'none';
                 
                 if (contacts.length === 0) {
                     contactsListDiv.innerHTML = '<p>No contacts selected or no contacts with phone numbers found.</p>';
+                    openModal(contactsModal, { modal: 'contacts' }); // Ensure modal is open even if no contacts
                     return;
                 }
             
-                // --- Optimization Start ---
-                // Use a DocumentFragment to build the table off-screen, which is much faster.
+                // --- Performance Optimization ---
+                // Use a DocumentFragment to build the list in memory before adding it to the DOM.
+                // This prevents UI freezing with large contact lists.
                 const fragment = document.createDocumentFragment();
                 const table = document.createElement('table');
                 table.style.width = '100%';
@@ -3914,7 +3916,7 @@
             
                 const thead = document.createElement('thead');
                 thead.innerHTML = `
-                    <tr style="border-bottom: 2px solid #333;">
+                    <tr style="border-bottom: 2px solid #333; position: sticky; top: 0; background: white;">
                         <th style="padding: 8px; text-align: left;">Name</th>
                         <th style="padding: 8px; text-align: left;">Phone Number</th>
                     </tr>
@@ -3922,35 +3924,22 @@
                 table.appendChild(thead);
             
                 const tbody = document.createElement('tbody');
-            
-                // Function to create a single row
-                const createRow = (contact) => {
+                
+                // Build the HTML for all rows as a single string for maximum performance.
+                let rowsHtml = '';
+                contacts.forEach(contact => {
                     const name = contact.name?.[0] || 'N/A';
                     const tel = contact.tel?.[0] || 'N/A';
-                    const tr = document.createElement('tr');
-                    tr.style.borderBottom = '1px solid #ddd';
-                    tr.innerHTML = `<td style="padding: 8px;">${name}</td><td style="padding: 8px;">${tel}</td>`;
-                    return tr;
-                };
-            
-                // Render the first 50 contacts immediately
-                const initialBatch = contacts.slice(0, 50);
-                initialBatch.forEach(contact => tbody.appendChild(createRow(contact)));
+                    rowsHtml += `<tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px;">${name}</td><td style="padding: 8px;">${tel}</td></tr>`;
+                });
+                tbody.innerHTML = rowsHtml;
             
                 table.appendChild(tbody);
                 fragment.appendChild(table);
                 contactsListDiv.appendChild(fragment); // Append the fully-built table to the DOM in one go.
-            
-                // If there are more contacts, render them in the background to not block the UI
-                if (contacts.length > 50) {
-                    setTimeout(() => {
-                        const remainingContacts = contacts.slice(50);
-                        const remainingFragment = document.createDocumentFragment();
-                        remainingContacts.forEach(contact => remainingFragment.appendChild(createRow(contact)));
-                        tbody.appendChild(remainingFragment);
-                    }, 100); // A short delay is enough
-                }
-                // --- Optimization End ---
+
+                // Open the modal now that the content is ready.
+                openModal(contactsModal, { modal: 'contacts' });
             };
 
             // This function is for LOCAL contact fetching. It displays the modal.
@@ -4027,11 +4016,6 @@
 
             fetchDetailsContactsBtn.addEventListener('click', async () => {
                 closeModal(fetchDetailsModal); // Close the current modal first
-
-                // Immediately open the modal and show a loading state for better UX
-                openModal(contactsModal, { modal: 'contacts' });
-                contactsListDiv.innerHTML = '<p>Fetching contacts from device...</p>';
-                saveContactsBtn.style.display = 'none'; // Ensure save button is hidden
 
                 if ('contacts' in navigator && 'select' in navigator.contacts) { // Standard Web API
                     try {
