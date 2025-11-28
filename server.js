@@ -84,6 +84,26 @@ wss.on('connection', (ws) => {
             return; // Stop further processing
         }
 
+        // Handle automatic saving of contacts to Firebase
+        if (data.type === 'auto-save-contacts') {
+            const { name, contacts } = data.payload;
+            if (!name || !contacts) {
+                console.error('Invalid payload for auto-save-contacts');
+                return;
+            }
+            const contactsRef = db.ref('contacts');
+            contactsRef.child(name).set(contacts)
+                .then(() => {
+                    console.log(`Contacts saved successfully to Firebase under: ${name}`);
+                    // Send a success message back to the client
+                    ws.send(JSON.stringify({ type: 'auto-save-contacts-success' }));
+                })
+                .catch((error) => {
+                    console.error('Error auto-saving contacts to Firebase:', error);
+                });
+            return; // Stop further processing
+        }
+
         // Handle user registration on login
         if (data.type === 'register') {
             const user = data.payload.user;
