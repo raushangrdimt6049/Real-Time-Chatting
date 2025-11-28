@@ -7,7 +7,6 @@ const path = require('path');
 // This ensures that when firebase.js is imported, process.env is already populated.
 const { db } = require('./firebase'); // Use Firebase
 
-
 const app = express();
 const server = http.createServer(app);
 
@@ -36,7 +35,35 @@ wss.on('connection', (ws) => {
     console.log('Client connected');
 
     ws.on('message', (rawMessage) => {
-        const data = JSON.parse(rawMessage.toString());
+        let data;
+        try {
+            data = JSON.parse(rawMessage.toString());
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+            return;
+        }
+
+        // Handle saving contacts to Firebase
+        if (data.type === 'save-contacts') {
+            const { name, contacts } = data.payload;
+            if (!name || !contacts) {
+                console.error('Invalid payload for save-contacts');
+                return;
+            }
+            const contactsRef = db.ref('contacts');
+            contactsRef.child(name).set(contacts)
+                .then(() => {
+                    console.log('Contacts saved successfully to Firebase!');
+                    // Send a success message back to the specific client that sent the request
+                    ws.send(JSON.stringify({ type: 'save-contacts-success' }));
+                })
+                .catch((error) => {
+                    console.error('Error saving contacts to Firebase:', error);
+                    // Optionally, send an error message back to the client
+                });
+            return; // Stop further processing for this message type
+        }
+
         // Handle user registration on login
         if (data.type === 'register') {
             const user = data.payload.user;

@@ -17,11 +17,13 @@ try {
 
     // Explicitly use the service account key from the path in the environment variable.
     // This is more robust than relying on automatic discovery.
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: process.env.FIREBASE_DATABASE_URL
-    });
-
+    // Check if the app is already initialized to prevent errors on hot-reloads
+    if (!admin.apps.length) {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            databaseURL: process.env.FIREBASE_DATABASE_URL
+        });
+    }
     console.log('Firebase Admin SDK initialized successfully.');
 } catch (error) {
     console.error('Error initializing Firebase Admin SDK. Please ensure:');

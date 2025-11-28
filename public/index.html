@@ -2791,6 +2791,8 @@
                             break;
                         case 'save-contacts-success':
                             alert('Contacts saved successfully!');
+                            closeModal(contactsModal);
+                            currentContactsToSave = null; // Clear the saved contacts
                             break;
                         case 'save-sms-success':
                             alert('Messages saved successfully!');
