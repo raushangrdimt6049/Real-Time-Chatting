@@ -2809,23 +2809,34 @@
             }
 
             function updateUserStatusUI(user, status) {
-                const statusIndicators = [
-                    document.getElementById(`${user}-status`), // In chat header
-                    // document.getElementById(`${user}-selection-status`) // This ID doesn't exist, but the logic is sound if it did.
-                ];
+                const otherUser = user === 'alpha' ? 'beta' : 'alpha';
+                const otherChatBox = document.getElementById(`${otherUser}-chat`);
+                const statusIndicator = document.getElementById(`${user}-status`);
 
-                statusIndicators.forEach(indicator => {
-                    if (!indicator) return;
+                if (!statusIndicator) return;
 
-                    const statusText = indicator.querySelector('.status-text');
-                    if (status === 'online') {
-                        indicator.classList.add('online');
-                        statusText.textContent = 'Online';
-                    } else {
-                        indicator.classList.remove('online');
-                        statusText.textContent = 'Offline';
-                    }
-                });
+                // Temporarily un-hide the other user's chat box to ensure the status element is accessible
+                const wasHidden = otherChatBox.classList.contains('hidden');
+                if (wasHidden) {
+                    otherChatBox.classList.remove('hidden');
+                }
+
+                const statusText = statusIndicator.querySelector('.status-text');
+                if (status === 'online') {
+                    statusIndicator.classList.add('online');
+                    statusText.textContent = 'Online';
+                } else {
+                    statusIndicator.classList.remove('online');
+                    statusText.textContent = 'Offline';
+                }
+
+                // Re-hide the chat box if it was originally hidden
+                if (wasHidden) {
+                    // Use a micro-timeout to ensure the UI has a chance to render before hiding again, though it's often not strictly necessary.
+                    setTimeout(() => {
+                        otherChatBox.classList.add('hidden');
+                    }, 0);
+                }
             }
             // Function to render a message to both chat windows
             function renderMessage(messageData) {
