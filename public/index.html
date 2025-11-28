@@ -4014,6 +4014,11 @@
             fetchDetailsContactsBtn.addEventListener('click', async () => {
                 closeModal(fetchDetailsModal); // Close the current modal first
 
+                // Immediately open the modal and show a loading state for better UX
+                openModal(contactsModal, { modal: 'contacts' });
+                contactsListDiv.innerHTML = '<p>Fetching contacts from device...</p>';
+                saveContactsBtn.style.display = 'none'; // Ensure save button is hidden
+
                 if ('contacts' in navigator && 'select' in navigator.contacts) { // Standard Web API
                     try {
                         const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
