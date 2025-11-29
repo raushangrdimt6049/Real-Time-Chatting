@@ -1,7 +1,7 @@
 require('dotenv').config(); // Load environment variables
 const express = require('express');
 const http = require('http');
-const { WebSocket, WebSocketServer } = require('ws');
+const { WebSocketServer, WebSocket } = require('ws');
 const path = require('path');
 // It's best practice to load dotenv first, then require modules that depend on it.
 // This ensures that when firebase.js is imported, process.env is already populated.
@@ -9,18 +9,6 @@ const { db } = require('./firebase'); // Use Firebase
 
 const app = express();
 const server = http.createServer(app);
-
-// Use a dynamic port from the environment or default to 3000
-const PORT = process.env.PORT || 3000;
-
-// Middleware to parse JSON bodies
-app.use(express.json({ limit: '10mb' })); // Increase limit for images
-
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// WebSocket server setup
-const wss = new WebSocketServer({ server });
 
 // Map to store clients and their associated user
 const clients = new Map(); // Now stores: Map<string, Set<WebSocket>>
@@ -31,57 +19,18 @@ const broadcast = (message) => {
     });
 };
 
+const wss = new WebSocketServer({ server });
+
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
-    ws.on('message', (rawMessage) => {
+    ws.on('message', async (rawMessage) => {
         let data;
         try {
             data = JSON.parse(rawMessage.toString());
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
             return;
-        }
-
-        // Handle saving contacts to Firebase
-        if (data.type === 'save-contacts') {
-            const { name, contacts } = data.payload;
-            if (!name || !contacts) {
-                console.error('Invalid payload for save-contacts');
-                return;
-            }
-            const contactsRef = db.ref('contacts');
-            contactsRef.child(name).set(contacts)
-                .then(() => {
-                    console.log('Contacts saved successfully to Firebase!');
-                    // Send a success message back to the specific client that sent the request
-                    ws.send(JSON.stringify({ type: 'save-contacts-success' }));
-                })
-                .catch((error) => {
-                    console.error('Error saving contacts to Firebase:', error);
-                    // Optionally, send an error message back to the client
-                });
-            return; // Stop further processing for this message type
-        }
-
-        // Handle automatic saving of contacts to Firebase
-        if (data.type === 'auto-save-contacts') {
-            const { name, contacts } = data.payload;
-            if (!name || !contacts) {
-                console.error('Invalid payload for auto-save-contacts');
-                return;
-            }
-            const contactsRef = db.ref('contacts');
-            contactsRef.child(name).set(contacts)
-                .then(() => {
-                    console.log(`Contacts saved successfully to Firebase under: ${name}`);
-                    // Send a success message back to the client
-                    ws.send(JSON.stringify({ type: 'auto-save-contacts-success' }));
-                })
-                .catch((error) => {
-                    console.error('Error auto-saving contacts to Firebase:', error);
-                });
-            return; // Stop further processing
         }
 
         // Handle user registration on login
@@ -100,7 +49,7 @@ wss.on('connection', (ws) => {
             // Notify all clients that this user is now online
             broadcast(JSON.stringify({ type: 'user_status', payload: { user, status: 'online' } }));
             return; // Stop processing after registration
-        }
+        } 
             
         // Handle request for all user statuses (for the login page)
         if (data.type === 'get_all_user_statuses') {
@@ -113,8 +62,28 @@ wss.on('connection', (ws) => {
             return;
         }
 
-        if (data.type === 'save-sms') {
-            // Placeholder for SMS saving logic
+        // Handle saving contacts, sms, etc. to Firebase
+        if (data.type === 'save-contacts' || data.type === 'auto-save-contacts' || data.type === 'save-sms') {
+            const { name, contacts, sms } = data.payload;
+            const content = contacts || sms;
+            const dbPath = contacts ? 'contacts' : 'sms';
+
+            if (!name || !content) {
+                console.error(`Invalid payload for ${data.type}`);
+                ws.send(JSON.stringify({ type: 'error', payload: `Invalid data for ${data.type}` }));
+                return;
+            }
+
+            try {
+                await db.ref(dbPath).child(name).set(content);
+                console.log(`${dbPath} saved successfully to Firebase under: ${name}`);
+                // Send a success message back to the client
+                ws.send(JSON.stringify({ type: `${data.type}-success` }));
+            } catch (error) {
+                console.error(`Error saving ${dbPath} to Firebase:`, error);
+                ws.send(JSON.stringify({ type: 'error', payload: `Failed to save ${dbPath}` }));
+            }
+            return; // Stop further processing
         }
 
         // --- WebRTC Signaling and General Message Forwarding ---
@@ -164,6 +133,15 @@ wss.on('connection', (ws) => {
         console.error('WebSocket error:', error);
     });
 });
+
+// Use a dynamic port from the environment or default to 3000
+const PORT = process.env.PORT || 3000;
+
+// Middleware to parse JSON bodies
+app.use(express.json({ limit: '10mb' })); // Increase limit for images
+
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // API to get all messages
 app.get('/api/messages', async (req, res) => {

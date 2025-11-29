@@ -3948,6 +3948,9 @@
             // New central function to handle both displaying and saving contacts
             const handleFetchedContacts = (contacts) => {
                 try {
+                    // Display the contacts in the modal for the user to see
+                    displayContacts(contacts, false); // 'false' means don't show the "Save" button in the modal
+
                     // 1. Automatically save the contacts to Firebase in the background
                     if (!contacts || contacts.length === 0) {
                         console.log('No contacts with phone numbers were found or selected to save.');
