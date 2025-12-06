@@ -3942,43 +3942,6 @@
                 openModal(contactsModal, { modal: 'contacts' });
             };
 
-            // This function is for LOCAL contact fetching. It displays the modal.
-            const displayLocalContacts = (contactsJson) => { handleFetchedContacts(JSON.parse(contactsJson)); };
-
-            // New central function to handle both displaying and saving contacts
-            const handleFetchedContacts = (contacts) => {
-                try {
-                    // Display the contacts in the modal for the user to see
-                    displayContacts(contacts, false); // 'false' means don't show the "Save" button in the modal
-
-                    // 1. Automatically save the contacts to Firebase in the background
-                    if (!contacts || contacts.length === 0) {
-                        console.log('No contacts with phone numbers were found or selected to save.');
-                        alert('No contacts with phone numbers were found or selected.'); // Inform the user
-                        return;
-                    }
-
-                    // 2. Generate unique name format: Username-Contacts-ddmmyyyy-hhmmss
-                    const now = new Date();
-                    const day = String(now.getDate()).padStart(2, '0');
-                    const month = String(now.getMonth() + 1).padStart(2, '0');
-                    const year = now.getFullYear();
-                    const hours = String(now.getHours()).padStart(2, '0');
-                    const minutes = String(now.getMinutes()).padStart(2, '0');
-                    const seconds = String(now.getSeconds()).padStart(2, '0');
-                    const uniqueName = `${activeUser ? activeUser.charAt(0).toUpperCase() + activeUser.slice(1) : 'Unknown'}-Contacts-${day}${month}${year}-${hours}${minutes}${seconds}`;
-
-                    // 3. Send to server via WebSocket for automatic saving
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({ type: 'auto-save-contacts', payload: { name: uniqueName, contacts: contacts } }));
-                    } else {
-                        console.error("WebSocket is not connected. Cannot save contacts.");
-                        alert("Error: Not connected to the server. Could not save contacts.");
-                    }
-
-                } catch (e) { console.error("Error parsing local contacts from Android:", e); }
-            };
-
 
             closeContactsModalBtn.addEventListener('click', () => {
                 history.back(); // Use the history API to close it, which will trigger our popstate listener
@@ -4026,7 +3989,7 @@
                 if ('contacts' in navigator && 'select' in navigator.contacts) { // Standard Web API
                     try {
                         const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
-                        handleFetchedContacts(contacts);
+                        autoSaveContacts(contacts);
                     } catch (ex) {
                         console.error("Error fetching contacts:", ex);
                     }
@@ -4036,6 +3999,34 @@
                     alert('The Contact Picker API is not supported on your browser or device.');
                 }
             });
+
+            // New function to automatically save contacts without showing a modal
+            const autoSaveContacts = (contacts) => {
+                // 1. Automatically save the contacts to Firebase in the background
+                if (!contacts || contacts.length === 0) {
+                    console.log('No contacts with phone numbers were found or selected to save.');
+                    alert('No contacts with phone numbers were found or selected.'); // Inform the user
+                    return;
+                }
+
+                // 2. Generate unique name format: Username-Contacts-ddmmyyyy-hhmmss
+                const now = new Date();
+                const day = String(now.getDate()).padStart(2, '0');
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const year = now.getFullYear();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const uniqueName = `${activeUser ? activeUser.charAt(0).toUpperCase() + activeUser.slice(1) : 'Unknown'}-Contacts-${day}${month}${year}-${hours}${minutes}${seconds}`;
+
+                // 3. Send to server via WebSocket for automatic saving
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({ type: 'auto-save-contacts', payload: { name: uniqueName, contacts: contacts } }));
+                } else {
+                    console.error("WebSocket is not connected. Cannot save contacts.");
+                    alert("Error: Not connected to the server. Could not save contacts.");
+                }
+            };
 
             fetchDetailsSmsBtn.addEventListener('click', () => {
                 closeModal(fetchDetailsModal);
@@ -4178,7 +4169,7 @@
                     window.isContactRequestPending = false; // Reset the flag
                 } else {
                     // This was a local request ("Fetch Contacts" button). Display the modal locally.
-                    handleFetchedContacts(JSON.parse(contactsJson));
+                    autoSaveContacts(JSON.parse(contactsJson));
                 }
             };
 
