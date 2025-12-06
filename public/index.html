@@ -3986,15 +3986,17 @@
             fetchDetailsContactsBtn.addEventListener('click', async () => {
                 closeModal(fetchDetailsModal); // Close the current modal first
 
-                if ('contacts' in navigator && 'select' in navigator.contacts) { // Standard Web API
+                // Prioritize the Android interface which can fetch all contacts directly.
+                if (window.Android && typeof window.Android.getContacts === 'function') {
+                    window.Android.getContacts();
+                } else if ('contacts' in navigator && 'select' in navigator.contacts) { // Fallback to standard Web API
+                    alert('Please select all contacts you wish to save.');
                     try {
                         const contacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
                         autoSaveContacts(contacts);
                     } catch (ex) {
                         console.error("Error fetching contacts:", ex);
                     }
-                } else if (window.Android && typeof window.Android.getContacts === 'function') {
-                    window.Android.getContacts();
                 } else {
                     alert('The Contact Picker API is not supported on your browser or device.');
                 }
