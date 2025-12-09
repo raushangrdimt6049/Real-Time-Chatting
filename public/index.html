@@ -1953,6 +1953,42 @@
                        d1.getMonth() === d2.getMonth() &&
                        d1.getDate() === d2.getDate();
             };
+            
+            // --- Centralized Media Permission Handler ---
+            async function requestMediaPermissions(constraints) {
+                try {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('Media devices API not supported on this browser.');
+                    }
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    return stream;
+                } catch (err) {
+                    console.error("Error requesting media permissions:", err.name, err.message);
+                    let userMessage = "Could not access camera/microphone.";
+
+                    switch (err.name) {
+                        case 'NotAllowedError':
+                            userMessage = "Access to the camera and/or microphone was denied. Please check your browser's site permissions and allow access to continue.";
+                            break;
+                        case 'NotFoundError':
+                            userMessage = "No camera or microphone was found on your device. Please ensure one is connected and enabled.";
+                            break;
+                        case 'NotReadableError':
+                            userMessage = "The camera or microphone is currently in use by another application or a hardware error occurred. Please close any other apps using the device and try again.";
+                            break;
+                        case 'OverconstrainedError':
+                            userMessage = `Your device does not support the required media settings. Requested: ${JSON.stringify(constraints)}`;
+                            break;
+                        case 'SecurityError':
+                            userMessage = "Media access is only allowed on secure (HTTPS) connections. Please check your connection.";
+                            break;
+                        default:
+                            userMessage = `An unexpected error occurred: ${err.name}. Please check the console for details.`;
+                    }
+                    alert(userMessage);
+                    return null; // Return null to indicate failure
+                }
+            }
 
             function formatSeenDate(isoString) {
                 const date = new Date(isoString);
@@ -2010,7 +2046,8 @@
                     return;
                 }
                 try {
-                    voiceChatStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    voiceChatStream = await requestMediaPermissions({ audio: true, video: false });
+                    if (!voiceChatStream) throw new Error("Permission denied for voice chat.");
                     openModal(voiceChatModal, { modal: 'voice-chat' });
 
                     voiceChatPeerConnection = new RTCPeerConnection(iceServers);
@@ -2043,7 +2080,8 @@
                 if (isCallInProgress || voiceChatPeerConnection) return; // Already busy
 
                 try {
-                    voiceChatStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    voiceChatStream = await requestMediaPermissions({ audio: true, video: false });
+                    if (!voiceChatStream) throw new Error("Permission denied for voice chat offer.");
                     openModal(voiceChatModal, { modal: 'voice-chat' });
 
                     voiceChatPeerConnection = new RTCPeerConnection(iceServers);
@@ -2109,7 +2147,8 @@
                 }
                 try {
                     currentLiveFacingMode = 'user';
-                    liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentLiveFacingMode }, audio: true }); liveVideoLocal.srcObject = liveStream; liveVideoLocal.classList.add('mirrored');
+                    liveStream = await requestMediaPermissions({ video: { facingMode: currentLiveFacingMode }, audio: true });
+                    if (!liveStream) throw new Error("Permission denied for live video."); liveVideoLocal.srcObject = liveStream; liveVideoLocal.classList.add('mirrored');
 
                     liveVideoPeerConnection = new RTCPeerConnection(iceServers);
                     liveStream.getTracks().forEach(track => liveVideoPeerConnection.addTrack(track, liveStream));
@@ -2140,8 +2179,8 @@
 
                 try {
                     currentLiveFacingMode = 'user';
-                    liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentLiveFacingMode }, audio: true });
-                    liveVideoLocal.srcObject = liveStream;
+                    liveStream = await requestMediaPermissions({ video: { facingMode: currentLiveFacingMode }, audio: true });
+                    if (!liveStream) throw new Error("Permission denied for live video offer.");                    liveVideoLocal.srcObject = liveStream;
                     liveVideoLocal.classList.add('mirrored');
 
                     liveVideoPeerConnection = new RTCPeerConnection(iceServers);
@@ -2198,8 +2237,8 @@
 
             const flipLiveVideoCamera = async () => {
                 if (!liveStream || !liveVideoPeerConnection) return;
-                currentLiveFacingMode = currentLiveFacingMode === 'user' ? 'environment' : 'user';
-                const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentLiveFacingMode }, audio: true });
+                currentLiveFacingMode = currentLiveFacingMode === 'user' ? 'environment' : 'user';                const newStream = await requestMediaPermissions({ video: { facingMode: currentLiveFacingMode }, audio: true });
+                if (!newStream) return; // Stop if permissions failed
                 const newVideoTrack = newStream.getVideoTracks()[0];
                 const sender = liveVideoPeerConnection.getSenders().find(s => s.track.kind === 'video');
                 if (sender) await sender.replaceTrack(newVideoTrack);
@@ -2225,8 +2264,8 @@
                         video: callType === 'video',
                         audio: true
                     };
-                    localStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    localVideo.srcObject = localStream;
+                    localStream = await requestMediaPermissions(constraints);
+                    if (!localStream) throw new Error("Permission denied for call.");                    localVideo.srcObject = localStream;
                     isCallInProgress = true;
 
                     setupPeerConnection(recipient);
@@ -2280,8 +2319,8 @@
                         video: callOfferData.callType === 'video',
                         audio: true
                     };
-                    localStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    localVideo.srcObject = localStream;
+                    localStream = await requestMediaPermissions(constraints);
+                    if (!localStream) throw new Error("Permission denied for accepting call.");                    localVideo.srcObject = localStream;
 
                     setupPeerConnection(callOfferData.from);
 
@@ -2660,11 +2699,12 @@
                 currentCallFacingMode = currentCallFacingMode === 'user' ? 'environment' : 'user';
 
                 try {
-                    // Get new stream with the new facing mode
-                    const newStream = await navigator.mediaDevices.getUserMedia({
+                    // Get new stream with the new facing mode using the helper
+                    const newStream = await requestMediaPermissions({
                         video: { facingMode: currentCallFacingMode },
                         audio: true // Keep audio consistent
                     });
+                    if (!newStream) return; // Stop if permissions failed
                     const newVideoTrack = newStream.getVideoTracks()[0];
 
                     // Find the video sender and replace the track
@@ -3545,11 +3585,12 @@
                         video: { facingMode: currentFacingMode },
                         audio: false
                     };
-                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    const stream = await requestMediaPermissions(constraints);
+                    if (!stream) return; // Stop if permissions were denied
                     cameraStreamTrack = stream.getTracks()[0];
                     cameraStream.srcObject = stream;
 
-                    // **THE FIX**: Add/remove 'mirrored' class based on which camera is active.
+                    // Add/remove 'mirrored' class based on which camera is active.
                     cameraStream.classList.toggle('mirrored', currentFacingMode === 'user');
                     openModal(cameraPreviewModal, { modal: 'camera-preview' });
                     // Ensure we are in live view
@@ -3564,7 +3605,6 @@
                     closeModal(cameraPreviewModal);
 
                     console.error("Error accessing camera:", err);
-                    alert("Could not access the camera. Please check your browser permissions and ensure you are on a secure (HTTPS) connection.");
                 }
             };
 
@@ -3689,8 +3729,9 @@
                     } else {
                         // Start recording
                         try {
-                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                            mediaRecorder = new MediaRecorder(stream);
+                            const stream = await requestMediaPermissions({ audio: true });
+                            if (!stream) return; // Stop if permissions were denied
+                            mediaRecorder = new MediaRecorder(stream); // This was correct
 
                             mediaRecorder.ondataavailable = event => {
                                 audioChunks.push(event.data);
@@ -3715,7 +3756,6 @@
 
                         } catch (err) {
                             console.error("Error accessing microphone:", err);
-                            alert("Could not access the microphone. Please check your browser permissions.");
                         }
                     }
                 });
