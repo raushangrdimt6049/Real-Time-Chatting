@@ -2954,18 +2954,6 @@
                     const messageDiv = document.createElement('div');
                     messageDiv.classList.add('message');
 
-                    if (msgContent.imageUrl) {
-                        const imageEl = document.createElement('img');
-                        imageEl.src = msgContent.imageUrl;
-                        imageEl.className = 'message-image';
-                        // Add click listener for zoom
-                        imageEl.addEventListener('click', () => {
-                            zoomedImage.src = imageEl.src;
-                            openModal(imageZoomModal, { modal: 'image-zoom' });
-                        });
-                        messageDiv.appendChild(imageEl);
-                    }
-
                     if (msgContent.videoUrl && !msgContent.fileUrl) { // Ensure it's not also a generic file
                         const videoEl = document.createElement('video');
                         videoEl.src = msgContent.videoUrl;
@@ -2997,6 +2985,19 @@
                         fileContainer.appendChild(downloadBtn);
 
                         messageDiv.appendChild(fileContainer);
+                    }
+
+                    // This block now handles ALL images and adds the zoom functionality.
+                    if (msgContent.imageUrl && !msgContent.fileUrl) {
+                        const imageEl = document.createElement('img');
+                        imageEl.src = msgContent.imageUrl;
+                        imageEl.className = 'message-image';
+                        // Add click listener for zoom
+                        imageEl.addEventListener('click', () => {
+                            zoomedImage.src = imageEl.src;
+                            openModal(imageZoomModal, { modal: 'image-zoom' });
+                        });
+                        messageDiv.appendChild(imageEl);
                     }
 
 
