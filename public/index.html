@@ -1037,6 +1037,63 @@
             text-shadow: 0 0 10px #f1c40f;
         }
 
+        /* --- Camera Preview Controls Styling --- */
+        #preview-controls {
+            background: rgba(0, 100, 0, 0.6); /* Dark green with some transparency */
+            backdrop-filter: blur(5px);
+            border-radius: 30px; /* Rounded corners */
+            padding: 15px 30px;
+            margin: 0 20px 20px 20px; /* Add margin to lift it from the bottom and sides */
+            width: calc(100% - 40px); /* Adjust width to account for margin */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        /* --- Attachment Preview Controls Styling --- */
+        #attachment-preview-controls {
+            background: rgba(0, 100, 0, 0.6); /* Dark green with some transparency */
+            backdrop-filter: blur(5px);
+            border-radius: 30px; /* Rounded corners */
+            padding: 15px 30px;
+            margin: 0 20px 20px 20px; /* Add margin to lift it from the bottom and sides */
+            width: calc(100% - 40px); /* Adjust width to account for margin */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        /* Reduce font size for Retake/Send buttons on attachment preview */
+        #attachment-preview-controls .camera-control-btn {
+            font-size: 1.2rem; /* Smaller font size */
+            font-weight: 600;  /* Make it bold */
+        }
+
+        /* Reduce font size for Retake/Send buttons on camera preview */
+        #preview-controls .camera-control-btn {
+            font-size: 1.2rem; /* Smaller font size */
+            font-weight: 600;  /* Make it bold */
+        }
+
+        /* --- Attachment Preview Specific Styles --- */
+        #attachment-preview-modal {
+            flex-direction: column; /* Ensure vertical layout */
+            justify-content: space-between; /* Pushes content and controls apart */
+        }
+        .attachment-preview-header {
+            position: absolute;
+            top: 0;
+            right: 0;
+            padding: 20px;
+            z-index: 1;
+        }
+        .attachment-preview-content {
+            flex-grow: 1; /* Takes up available space */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%; /* Ensure it can fill the space */
+            overflow: hidden; /* Prevent content from overflowing */
+            padding: 60px 20px; /* Add padding to avoid edges */
+        }
+
         .capture-btn {
             width: 70px;
             height: 70px;
@@ -1435,35 +1492,43 @@
 
     <!-- Attachment Preview Modal -->
     <div id="attachment-preview-modal" class="camera-preview-overlay hidden">
-        <img id="attachment-preview-image" class="hidden" src="" alt="Attachment Preview">
-        <video id="attachment-preview-video" class="hidden" controls src=""></video>
-        <div id="attachment-preview-file" class="hidden">
-            <span style="font-size: 5rem;">📄</span>
-            <h3 id="attachment-preview-filename"></h3>
+        <div class="attachment-preview-header">
+            <button id="close-attachment-preview" class="camera-control-btn" title="Close">❌</button>
+        </div>
+        <div class="attachment-preview-content">
+            <img id="attachment-preview-image" class="hidden" src="" alt="Attachment Preview">
+            <video id="attachment-preview-video" class="hidden" controls src=""></video>
+            <div id="attachment-preview-file" class="hidden">
+                <span style="font-size: 5rem;">📄</span>
+                <h3 id="attachment-preview-filename"></h3>
+            </div>
         </div>
         <div id="attachment-preview-controls" class="camera-controls">
-            <button id="close-attachment-preview" class="camera-control-btn" title="Close">❌</button>
+            <button id="reattach-file-btn" class="camera-control-btn" title="Change File">🔄 Retake</button>
             <button id="send-attachment-btn" class="camera-control-btn" title="Send">Send ➤</button>
-            <button id="reattach-file-btn" class="camera-control-btn" title="Change File">🔄</button>
         </div>
     </div>
 
 
     <!-- Camera Preview Modal -->
     <div id="camera-preview-modal" class="camera-preview-overlay hidden">
-        <div id="live-camera-top-controls" class="camera-top-controls">
-            <button id="toggle-flash-btn" class="camera-control-btn" title="Toggle Flash">⚡</button>
+        <!-- This container holds the live camera view and its specific controls -->
+        <div id="live-camera-view" class="hidden" style="width:100%; height:100%; position:relative; display:flex; flex-direction:column;">
+            <div id="live-camera-top-controls" class="camera-top-controls">
+                <button id="toggle-flash-btn" class="camera-control-btn" title="Toggle Flash">⚡</button>
+            </div>
+            <video id="camera-stream" autoplay playsinline></video>
+            <div id="live-camera-controls" class="camera-controls">
+                <button id="close-camera-preview" class="camera-control-btn" title="Close">❌</button>
+                <button id="capture-photo-btn" class="camera-control-btn capture-btn" title="Capture Photo"></button>
+                <button id="flip-camera-btn" class="camera-control-btn" title="Flip Camera">🔄</button>
+            </div>
         </div>
-        <video id="camera-stream" autoplay playsinline></video>
-        <img id="photo-preview" class="hidden" src="" alt="Captured Photo">
-        <div id="live-camera-controls" class="camera-controls">
-            <button id="close-camera-preview" class="camera-control-btn" title="Close">❌</button>
-            <button id="capture-photo-btn" class="camera-control-btn capture-btn" title="Capture Photo"></button>
-            <button id="flip-camera-btn" class="camera-control-btn" title="Flip Camera">🔄</button>
-        </div>
-        <div id="preview-controls" class="camera-controls hidden">
-            <button id="retake-photo-btn" class="camera-control-btn" title="Retake">🔄 Retake</button>
-            <button id="send-photo-btn" class="camera-control-btn" title="Send">Send ➤</button>
+        <!-- This container holds the photo preview and its specific controls -->
+        <div id="photo-preview-view" class="hidden" style="width:100%; height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+            <div class="attachment-preview-header"><button id="close-photo-preview" class="camera-control-btn" title="Close">❌</button></div>
+            <div class="attachment-preview-content"><img id="photo-preview" src="" alt="Captured Photo"></div>
+            <div id="preview-controls" class="camera-controls"><button id="retake-photo-btn" class="camera-control-btn" title="Retake">🔄 Retake</button><button id="send-photo-btn" class="camera-control-btn" title="Send">Send ➤</button></div>
         </div>
     </div>
 
@@ -3487,15 +3552,16 @@
                     cameraStream.classList.toggle('mirrored', currentFacingMode === 'user');
                     openModal(cameraPreviewModal, { modal: 'camera-preview' });
                     // Ensure we are in live view
-                    cameraStream.classList.remove('hidden');
-                    photoPreview.classList.add('hidden');
-                    document.getElementById('live-camera-controls').classList.remove('hidden');
-                    document.getElementById('live-camera-top-controls').classList.remove('hidden');
-
-                    document.getElementById('preview-controls').classList.add('hidden');
+                    document.getElementById('live-camera-view').classList.remove('hidden');
+                    document.getElementById('photo-preview-view').classList.add('hidden');
 
                     activeUserForAttachment = user; // Set which user is capturing
                 } catch (err) {
+                    // Clean up on error
+                    document.getElementById('live-camera-view').classList.add('hidden');
+                    document.getElementById('photo-preview-view').classList.add('hidden');
+                    closeModal(cameraPreviewModal);
+
                     console.error("Error accessing camera:", err);
                     alert("Could not access the camera. Please check your browser permissions and ensure you are on a secure (HTTPS) connection.");
                 }
@@ -3519,6 +3585,7 @@
             });
 
             closeCameraPreviewButton.addEventListener('click', closeCamera);
+            document.getElementById('close-photo-preview').addEventListener('click', closeCamera);
 
             capturePhotoButton.addEventListener('click', () => {
                 const canvas = document.createElement('canvas');
@@ -3540,20 +3607,14 @@
                 context.setTransform(1, 0, 0, 1, 0, 0); // Reset transform for next use
 
                 // Switch to preview mode
-                cameraStream.classList.add('hidden');
-                photoPreview.classList.remove('hidden');
-                document.getElementById('live-camera-controls').classList.add('hidden');
-                document.getElementById('live-camera-top-controls').classList.add('hidden');
-                document.getElementById('preview-controls').classList.remove('hidden');
+                document.getElementById('live-camera-view').classList.add('hidden');
+                document.getElementById('photo-preview-view').classList.remove('hidden');
             });
 
             retakePhotoButton.addEventListener('click', () => {
                 // Switch back to live camera mode
-                cameraStream.classList.remove('hidden');
-                photoPreview.classList.add('hidden');
-                document.getElementById('live-camera-controls').classList.remove('hidden');
-                document.getElementById('live-camera-top-controls').classList.remove('hidden');
-                document.getElementById('preview-controls').classList.add('hidden');
+                document.getElementById('live-camera-view').classList.remove('hidden');
+                document.getElementById('photo-preview-view').classList.add('hidden');
                 capturedImageDataUrl = null;
             });
 
