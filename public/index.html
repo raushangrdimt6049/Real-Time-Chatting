@@ -795,6 +795,37 @@
             box-shadow: 0 0 50px rgba(0,0,0,0.5);
         }
 
+        .image-zoom-container {
+            width: 90vw;
+            height: 90vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* This is crucial for panning */
+        }
+
+        #zoomed-image {
+            transition: transform 0.2s ease-out;
+            cursor: grab;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 2001; /* Above the image */
+        }
+        .zoom-controls button { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+        #zoom-slider { width: 200px; }
+
         .close-zoom-button {
             position: absolute;
             top: 20px;
@@ -804,6 +835,7 @@
             font-weight: bold;
             cursor: pointer;
             transition: color 0.2s;
+            z-index: 2001; /* Above the image */
         }
 
         .refresh-chat-button {
@@ -1487,7 +1519,14 @@
     <!-- Image Zoom Modal -->
     <div id="image-zoom-modal" class="image-zoom-modal-overlay hidden">
         <span class="close-zoom-button">&times;</span>
-        <img id="zoomed-image" src="" alt="Zoomed Image">
+        <div class="image-zoom-container">
+            <img id="zoomed-image" src="" alt="Zoomed Image">
+        </div>
+        <div class="zoom-controls">
+            <button id="zoom-out-btn">-</button>
+            <input type="range" id="zoom-slider" min="1" max="5" step="0.1" value="1">
+            <button id="zoom-in-btn">+</button>
+        </div>
     </div>
 
     <!-- Attachment Preview Modal -->
@@ -1806,6 +1845,11 @@
             const imageZoomModal = document.getElementById('image-zoom-modal');
             const zoomedImage = document.getElementById('zoomed-image');
             const closeZoomButton = document.querySelector('.close-zoom-button');
+            const zoomSlider = document.getElementById('zoom-slider');
+            const zoomInBtn = document.getElementById('zoom-in-btn');
+            const zoomOutBtn = document.getElementById('zoom-out-btn');
+            const imageZoomContainer = document.querySelector('.image-zoom-container');
+
 
             // New elements for voice recording
             const voiceRecordButtons = document.querySelectorAll('.voice-record-button');
@@ -3825,10 +3869,71 @@
             // --- Image Zoom Logic ---
             const closeZoomModal = () => {
                 closeModal(imageZoomModal);
+                // Reset zoom when closing
+                zoomedImage.style.transform = 'scale(1) translate(0, 0)';
+                zoomSlider.value = 1;
+                zoomedImage.style.cursor = 'grab';
+
             };
 
             closeZoomButton.addEventListener('click', closeZoomModal);
             imageZoomModal.addEventListener('click', (e) => { if (e.target === imageZoomModal) closeZoomModal(); });
+
+            // --- New Zoom and Pan Logic ---
+            let isPanning = false;
+            let startX, startY, lastX, lastY;
+
+            const updateZoom = (scale) => {
+                zoomedImage.style.transform = `scale(${scale})`;
+                zoomSlider.value = scale;
+                zoomedImage.style.cursor = scale > 1 ? 'move' : 'grab';
+            };
+
+            zoomSlider.addEventListener('input', (e) => {
+                updateZoom(e.target.value);
+            });
+
+            zoomInBtn.addEventListener('click', () => {
+                let newScale = parseFloat(zoomSlider.value) + 0.5;
+                if (newScale > zoomSlider.max) newScale = zoomSlider.max;
+                updateZoom(newScale);
+            });
+
+            zoomOutBtn.addEventListener('click', () => {
+                let newScale = parseFloat(zoomSlider.value) - 0.5;
+                if (newScale < zoomSlider.min) newScale = zoomSlider.min;
+                updateZoom(newScale);
+            });
+
+            imageZoomContainer.addEventListener('mousedown', (e) => {
+                if (parseFloat(zoomSlider.value) > 1) {
+                    isPanning = true;
+                    startX = e.pageX - imageZoomContainer.offsetLeft;
+                    startY = e.pageY - imageZoomContainer.offsetTop;
+                    lastX = imageZoomContainer.scrollLeft;
+                    lastY = imageZoomContainer.scrollTop;
+                    zoomedImage.style.cursor = 'grabbing';
+                }
+            });
+
+            const stopPanning = () => {
+                isPanning = false;
+                zoomedImage.style.cursor = parseFloat(zoomSlider.value) > 1 ? 'move' : 'grab';
+            };
+
+            imageZoomContainer.addEventListener('mouseleave', stopPanning);
+            imageZoomContainer.addEventListener('mouseup', stopPanning);
+
+            imageZoomContainer.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+                e.preventDefault();
+                const x = e.pageX - imageZoomContainer.offsetLeft;
+                const y = e.pageY - imageZoomContainer.offsetTop;
+                const walkX = (x - startX) * 2; // The *2 makes it feel more responsive
+                const walkY = (y - startY) * 2;
+                imageZoomContainer.scrollLeft = lastX - walkX;
+                imageZoomContainer.scrollTop = lastY - walkY;
+            });
 
             // --- Login and View Switching Logic ---
             loginForm.addEventListener('submit', (e) => {
