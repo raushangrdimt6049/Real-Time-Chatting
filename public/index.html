@@ -4505,10 +4505,14 @@
                 // We should re-open that modal.
                 if (destinationState.modal) {
                     const modalToReopen = document.getElementById(`${destinationState.modal}-modal`);
-                    if (modalToReopen) openModal(modalToReopen, destinationState);
+                    if (modalToReopen) {
+                        modalToReopen.classList.remove('hidden');
+                        modalToReopen.classList.add('visible');
+                    }
                 } else if (!destinationState.loggedIn) {
                     // We've gone back to the main chat screen state.
                     // This is where we ask for logout confirmation.
+                    history.pushState({ loggedIn: true }, 'Chat');
                     openModal(confirmLogoutModal, { modal: 'confirm-logout' });
                 }
                 // If state is null, it means we've gone back past the login, so the user is effectively logged out.
@@ -4522,10 +4526,7 @@
             });
 
             cancelLogoutBtn.addEventListener('click', () => {
-                // If the user cancels, we need to push the state back so that the
-                // next back/forward click will trigger the 'popstate' event again.
-                // This effectively cancels the browser's navigation attempt.
-                history.forward();
+                history.back();
             });
 
             // Also close modal if clicking on the overlay
